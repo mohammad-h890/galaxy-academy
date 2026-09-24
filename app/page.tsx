@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useSyncExternalStore } from 'react';
+import React, { useState } from 'react';
 import { Header } from '@/components/Header';
 import { RobotGuide } from '@/components/RobotGuide';
 import { FractionsModule } from '@/components/FractionsModule';
@@ -42,22 +42,7 @@ type ViewMode =
   | 'geometry'
   | 'statistics';
 
-// Client check using useSyncExternalStore to eliminate any hydration mismatch or synchronous setState in effect
-function emptySubscribe() {
-  return () => {};
-}
-
-function useIsClient() {
-  return useSyncExternalStore(
-    emptySubscribe,
-    () => true,
-    () => false
-  );
-}
-
 export default function Home() {
-  const isClient = useIsClient();
-
   const [appState, setAppState] = useState<AppState>(() => {
     if (typeof window !== 'undefined') {
       return loadAppState();
@@ -219,18 +204,6 @@ export default function Home() {
     },
   ];
 
-  // Prevent SSR/CSR mismatch by rendering the loading shell on server and before client is ready
-  if (!isClient) {
-    return (
-      <div className="relative min-h-screen bg-[#07090f] text-slate-200 overflow-x-hidden p-4 md:p-6 flex items-center justify-center">
-        <div className="flex items-center gap-3 text-cyan-400">
-          <div className="w-4 h-4 rounded-full bg-cyan-400 animate-ping" />
-          <span>در حال اتصال به سامانه‌های سفینه امید...</span>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="relative min-h-screen bg-[#07090f] text-slate-200 overflow-x-hidden p-4 md:p-6">
       {/* Background Starfield and Nebula Glow */}
@@ -299,7 +272,7 @@ export default function Home() {
               <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
                 <div>
                   <h2 className="text-xl md:text-2xl font-bold text-white flex items-center gap-2">
-                    <span>خوش آمدید، مهندس {appState.playerName}</span>
+                    <span>خوش آمدید، مهندس {appState.playerName || 'گرامی'}</span>
                     <Sparkles className="w-5 h-5 text-cyan-400" />
                   </h2>
                   <p className="text-xs md:text-sm text-slate-400 mt-1">
@@ -331,7 +304,7 @@ export default function Home() {
 
             {/* Robot Guide Welcome */}
             <RobotGuide
-              message={`مهندس ${appState.playerName}، با حل چالش‌های ریاضی ۱۵ مرحله‌ای انرژی حیات به دست بیاورید و سپس با استفاده از سامانه زیر، انرژی را به سیاره تزریق کنید تا جنگل‌ها و مراتع سرسبز شوند.`}
+              message={`مهندس ${appState.playerName || 'گرامی'}، با حل چالش‌های ریاضی ۱۵ مرحله‌ای انرژی حیات به دست بیاورید و سپس با استفاده از سامانه زیر، انرژی را به سیاره تزریق کنید تا جنگل‌ها و مراتع سرسبز شوند.`}
               mood={appState.planetGreenery >= 80 ? 'excited' : 'happy'}
             />
 
@@ -470,7 +443,7 @@ export default function Home() {
         )}
       </div>
 
-      {/* Teacher Dashboard Modal (Password Removed) */}
+      {/* Teacher Dashboard Modal */}
       <TeacherDashboardModal
         isOpen={isTeacherModalOpen}
         onClose={() => setIsTeacherModalOpen(false)}
