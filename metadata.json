@@ -1,0 +1,6 @@
+{
+  "name": "آکادمی مهندسان کهکشان: سفینه امید",
+  "description": "سامانه تعاملی آموزش و حل چالش‌های مفهومی ریاضی (کسر، اعشار، تناسب، هندسه و زمان) در قالب ماموریت نجات سیاره کهکشانی",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
