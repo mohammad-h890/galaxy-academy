@@ -72,7 +72,7 @@ export function VictoryModal({ isOpen, onClose, playerName }: VictoryModalProps)
 
         <p className="text-sm md:text-base text-slate-300 leading-relaxed mb-6">
           تبریک ویژه به مهندس <strong className="text-white font-bold">{playerName}</strong>!
-          شما با تسلط بر ۵ گلوگاه مفهومی ریاضی (کسرها، اعشار، تناسب، هندسه و زمان)، تمام بخش‌های سفینه امید را بازسازی کرده و حیات را به سیاره کهکشانی بازگرداندید.
+          شما با کسب بیش از <strong>۱۵۰۰ امتیاز حیات</strong> و تسلط بر ۵ گلوگاه مفهومی ریاضی (کسرها، اعشار، تناسب، هندسه و زمان)، تمام بخش‌های سفینه امید را بازسازی کرده و به <strong>پوشش ۱۰۰٪ و سرسبزی کامل سیاره</strong> دست یافتید.
         </p>
 
         <div className="flex justify-center">

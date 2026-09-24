@@ -95,6 +95,10 @@ export const SoundFX = {
     }, 80);
   },
 
+  laser: () => {
+    SoundFX.laserAlign();
+  },
+
   gearSpin: () => {
     SoundFX.playTone(190, 'sawtooth', 0.09, 0.15);
     setTimeout(() => {

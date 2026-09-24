@@ -5,7 +5,7 @@ import { SoundFX } from '@/lib/sound';
 import { RobotGuide } from './RobotGuide';
 import { CelebrationOverlay } from './CelebrationOverlay';
 import { toEnglishNumber, toPersianDigits } from '@/lib/utils';
-import { ArrowRight, Sparkles, Check, Scissors, Zap } from 'lucide-react';
+import { ArrowRight, Sparkles, Check, Scissors, Zap, Shapes, RotateCw } from 'lucide-react';
 
 interface GeometryModuleProps {
   onBack: () => void;
@@ -14,15 +14,14 @@ interface GeometryModuleProps {
   onLogMistake: () => void;
 }
 
-interface GeometryQuestion {
-  type: 'rhombus' | 'trapezoid';
-  d1: number;
-  d2: number;
-  b1: number;
-  b2: number;
-  h: number;
-  area: number;
-}
+type GeometrySubTopic =
+  | 'central_symmetry'
+  | 'angles_bisector'
+  | 'rhombus_trapezoid'
+  | 'circle_perimeter'
+  | 'volume_capacity';
+
+type SymmetryShapeType = 'parallelogram' | 'circle' | 'equilateral_triangle' | 'letter_N' | 'trapezoid';
 
 const TOTAL_STAGES = 15;
 
@@ -35,159 +34,299 @@ export function GeometryModule({
   const [slide, setSlide] = useState(0);
   const [inGame, setInGame] = useState(false);
   const [score, setScore] = useState(0);
+  const [subTopic, setSubTopic] = useState<GeometrySubTopic>('rhombus_trapezoid');
 
-  const [q, setQ] = useState<GeometryQuestion>({
-    type: 'rhombus',
+  // 1. Central Symmetry States with diverse shapes
+  const [symShape, setSymShape] = useState<SymmetryShapeType>('parallelogram');
+  const [isRotated180, setIsRotated180] = useState(false);
+
+  // 2. Angles & Bisector
+  const [angleType, setAngleType] = useState<'triangle' | 'quad'>('triangle');
+  const [ang1, setAng1] = useState(50);
+  const [ang2, setAng2] = useState(70);
+  const [ang3, setAng3] = useState(0);
+  const [missingAngle, setMissingAngle] = useState(60);
+  const [userAngle, setUserAngle] = useState('');
+
+  // 3. Rhombus & Trapezoid (Laser cut simulation)
+  const [geoQ, setGeoQ] = useState({
+    type: 'rhombus' as 'rhombus' | 'trapezoid',
     d1: 10,
     d2: 6,
     b1: 4,
     b2: 8,
-    h: 4,
+    h: 5,
     area: 30,
   });
-
   const [isSimulated, setIsSimulated] = useState(false);
-  const [in1, setIn1] = useState('');
-  const [in2, setIn2] = useState('');
-  const [in3, setIn3] = useState('');
-  const [inAns, setInAns] = useState('');
-  const [feedback, setFeedback] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
+  const [ansArea, setAnsArea] = useState('');
+
+  // 4. Circle Perimeter & Pi
+  const [circleGiven, setCircleGiven] = useState<'radius' | 'diameter'>('radius');
+  const [circleVal, setCircleVal] = useState(5);
+  const [circlePerimeter, setCirclePerimeter] = useState('31.4');
+  const [ansPerimeter, setAnsPerimeter] = useState('');
+
+  // 5. Volume & Capacity Units with Mandatory Unit Conversion
+  const [volQuestion, setVolQuestion] = useState({
+    name: 'مخزن سوخت فضاپیما',
+    lM: 2,
+    wM: 1,
+    hM: 0.5,
+    lStr: '۲',
+    wStr: '۱',
+    hStr: '۰/۵',
+    lCm: 200,
+    wCm: 100,
+    hCm: 50,
+    volM3: 1,
+    volCm3: 1000000,
+    targetUnit: 'سانتی‌متر مکعب (cm³)',
+    story: 'یک مخزن سوخت فضاپیما با ابعاد طول ۲ متر، عرض ۱ متر و ارتفاع ۰/۵ متر در بخش انبار نصب شده است.',
+    hint: '۲ متر = ۲۰۰ سانتی‌متر، ۱ متر = ۱۰۰ سانتی‌متر، ۰/۵ متر = ۵۰ سانتی‌متر ⬅️ ۲۰۰ × ۱۰۰ × ۵۰ = ۱,۰۰۰,۰۰۰ سانتی‌متر مکعب (یا ۱ متر مکعب = ۱,۰۰۰,۰۰۰ سانتی‌متر مکعب).',
+  });
+  const [showUnitGuide, setShowUnitGuide] = useState(false);
+  const [ansVol, setAnsVol] = useState('');
+
+  const [feedback, setFeedback] = useState<{ type: 'error' | 'success'; message: string } | null>(
+    null
+  );
   const [showCelebration, setShowCelebration] = useState(false);
 
   const lessonSlides = [
     {
-      text: 'بدنه و صفحات خورشیدی سفینه امید از دو ساختار هندسی مقاوم تشکیل شده‌اند: لوزی و ذوزنقه.',
-      tip: 'لوزی = چهارضلعی با اضلاع برابر و قطرهای عمود برهم · ذوزنقه = چهارضلعی با دو قاعده موازی.',
+      title: '۱. تقارن مرکزی: دوران ۱۸۰ درجه حول نقطه (ص ۷۳ و ۷۴)',
+      text: 'تقارن مرکزی یعنی شکل حول یک نقطه دقیقاً ۱۸۰ درجه (نیم‌دور) بچرخد و روی خودش منطبق شود. متوازی‌الاضلاع، دایره و حرف N تقارن مرکزی دارند، اما مثلث متساوی‌الاضلاع و ذوزنقه تقارن مرکزی ندارند چون با ۱۸۰ درجه چرخش وارونه می‌شوند!',
+      tip: 'اگر شکل را نیم‌دور بچرخانید و جهت آن حفظ شود، مرکز تقارن دارد.',
       mood: 'happy' as const,
     },
     {
-      text: 'چرا در مساحت ذوزنقه تقسیم بر ۲ داریم؟ اگر یک ذوزنقه هم‌اندازه را ۱۸۰ درجه بچرخانیم و در کنار آن قرار دهیم، یک متوازی‌الاضلاع کامل ساخته می‌شود که قاعده آن برابر با (مجموع دو قاعده) و ارتفاعش همان ارتفاع ذوزنقه است. بنابراین مساحت یک ذوزنقه نصف آن متوازی‌الاضلاع است!',
-      tip: 'فرمول ذوزنقه: ((قاعده کوچک + قاعده بزرگ) × ارتفاع) ÷ ۲ · فرمول لوزی: (قطر بزرگ × قطر کوچک) ÷ ۲',
+      title: '۲. مجموع زوایای مثلث و چهارضلعی‌ها + نیمساز (ص ۷۵ تا ۸۳)',
+      text: 'مجموع زاویه‌های داخلی هر مثلث همیشه ۱۸۰ درجه و هر چهارضلعی ۳۶۰ درجه است.',
+      tip: 'برای یافتن زاویه مجهول در مثلث: مجموع دو زاویه معلوم را از ۱۸۰ کم کنید.',
+      mood: 'excited' as const,
+    },
+    {
+      title: '۳. مساحت لوزی و ذوزنقه با شبیه‌سازی لیزری (ص ۱۰۶ تا ۱۰۹)',
+      text: 'فرمول لوزی: (قطر بزرگ × قطر کوچک) ÷ ۲. فرمول ذوزنقه: ((قاعده بزرگ + قاعده کوچک) × ارتفاع) ÷ ۲.',
+      tip: 'علت تقسیم بر ۲: مساحت لوزی نصف مساحت مستطیل پیرامون آن است.',
       mood: 'warning' as const,
     },
     {
-      text: 'با فشردن دکمه «شبیه‌سازی لیزری»، جفت قرینه ذوزنقه چرخانده شده و متوازی‌الاضلاع کامل را تشکیل می‌دهد تا علت دقیق مجموع دو قاعده و تقسیم بر ۲ را به چشم ببینید.',
-      tip: 'همیشه تقسیم بر ۲ را به یاد داشته باشید زیرا شکل حاصل از دو ذوزنقه هم‌اندازه ساخته شده است.',
-      mood: 'excited' as const,
+      title: '۴. محیط دایره و عدد پی: دام شعاع به جای قطر! (ص ۱۱۰ تا ۱۱۲)',
+      text: 'فرمول محیط دایره: قطر × ۳/۱۴. اگر سوال شعاع داد، حتماً ابتدا آن را دوبرابر کنید تا قطر به دست آید!',
+      tip: 'محیط = ۲ × شعاع × ۳/۱۴',
+      mood: 'warning' as const,
+    },
+    {
+      title: '۵. حجم مکعب‌مستطیل و چالش تبدیل واحد (متر به سانتی‌متر مکعب) (ص ۱۱۳ تا ۱۲۱)',
+      text: 'حجم مکعب‌مستطیل = طول × عرض × ارتفاع. اگر ابعاد به «متر» باشد و حجم را به «سانتی‌متر مکعب» بخواهند، یا ابتدا هر بعد را به سانتی‌متر تبدیل کنید (هر ۱ متر = ۱۰۰ سانتی‌متر) و سپس ضرب کنید، یا حجم را به متر مکعب به دست آورده و در ۱,۰۰۰,۰۰۰ ضرب نمایید (چون ۱ متر مکعب = ۱,۰۰۰,۰۰۰ سانتی‌متر مکعب است)!',
+      tip: '۱ متر = ۱۰۰ سانتی‌متر ⬅️ ۱ متر مکعب = ۱,۰۰۰,۰۰۰ سانتی‌متر مکعب = ۱۰۰۰ لیتر',
+      mood: 'warning' as const,
     },
   ];
 
-  const generateQuestion = () => {
-    const isRhombus = Math.random() > 0.5;
-
-    if (isRhombus) {
-      const d1 = (Math.floor(Math.random() * 5) + 3) * 2;
-      const d2 = (Math.floor(Math.random() * 4) + 2) * 2;
-      const area = (d1 * d2) / 2;
-      setQ({ type: 'rhombus', d1, d2, b1: 0, b2: 0, h: 0, area });
-    } else {
-      const b1 = Math.floor(Math.random() * 4) + 3; // 3 to 6
-      const b2 = Math.floor(Math.random() * 4) + 7; // 7 to 10
-      const h = (Math.floor(Math.random() * 4) + 2) * 2; // 4, 6, 8, 10
-      const area = ((b1 + b2) * h) / 2;
-      setQ({ type: 'trapezoid', d1: 0, d2: 0, b1, b2, h, area });
-    }
-
-    setIsSimulated(false);
-    setIn1('');
-    setIn2('');
-    setIn3('');
-    setInAns('');
+  // Dynamic random questions for each stage
+  const generateQuestionForStage = (currentStage: number) => {
     setFeedback(null);
+    const topics: GeometrySubTopic[] = [
+      'rhombus_trapezoid',
+      'circle_perimeter',
+      'angles_bisector',
+      'central_symmetry',
+      'volume_capacity',
+    ];
+    const chosenTopic = topics[currentStage % topics.length];
+    setSubTopic(chosenTopic);
+
+    if (chosenTopic === 'rhombus_trapezoid') {
+      const isRhombus = Math.random() > 0.5;
+      if (isRhombus) {
+        const d1 = (Math.floor(Math.random() * 5) + 3) * 2;
+        const d2 = (Math.floor(Math.random() * 4) + 2) * 2;
+        setGeoQ({ type: 'rhombus', d1, d2, b1: 0, b2: 0, h: 0, area: (d1 * d2) / 2 });
+      } else {
+        const b1 = Math.floor(Math.random() * 4) + 3;
+        const b2 = Math.floor(Math.random() * 5) + 7;
+        const h = (Math.floor(Math.random() * 3) + 2) * 2;
+        setGeoQ({ type: 'trapezoid', d1: 0, d2: 0, b1, b2, h, area: ((b1 + b2) * h) / 2 });
+      }
+      setIsSimulated(false);
+      setAnsArea('');
+    } else if (chosenTopic === 'circle_perimeter') {
+      const isRadius = Math.random() > 0.5;
+      const r = [5, 10, 15, 20, 25][Math.floor(Math.random() * 5)];
+      setCircleGiven(isRadius ? 'radius' : 'diameter');
+      setCircleVal(isRadius ? r : r * 2);
+      const diameter = r * 2;
+      setCirclePerimeter((diameter * 3.14).toFixed(1));
+      setAnsPerimeter('');
+    } else if (chosenTopic === 'angles_bisector') {
+      const isTri = Math.random() > 0.5;
+      setAngleType(isTri ? 'triangle' : 'quad');
+      if (isTri) {
+        const a1 = (Math.floor(Math.random() * 5) + 4) * 10;
+        const a2 = (Math.floor(Math.random() * 4) + 3) * 10;
+        const missing = 180 - (a1 + a2);
+        setAng1(a1);
+        setAng2(a2);
+        setMissingAngle(missing);
+      } else {
+        const a1 = (Math.floor(Math.random() * 3) + 9) * 10; // 90..110
+        const a2 = (Math.floor(Math.random() * 3) + 7) * 10; // 70..90
+        const a3 = (Math.floor(Math.random() * 3) + 8) * 10; // 80..100
+        const missing = 360 - (a1 + a2 + a3);
+        setAng1(a1);
+        setAng2(a2);
+        setAng3(a3);
+        setMissingAngle(missing);
+      }
+      setUserAngle('');
+    } else if (chosenTopic === 'central_symmetry') {
+      // Pick random shape from diverse pool
+      const shapes: SymmetryShapeType[] = ['parallelogram', 'circle', 'equilateral_triangle', 'letter_N', 'trapezoid'];
+      const s = shapes[Math.floor(Math.random() * shapes.length)];
+      setSymShape(s);
+      setIsRotated180(false);
+    } else {
+      // Volume with Unit Conversion: Dimensions in Meters -> Volume in cm³
+      const volumeScenarios = [
+        {
+          name: 'مخزن سوخت فضاپیما',
+          lM: 2, wM: 1, hM: 0.5,
+          lStr: '۲', wStr: '۱', hStr: '۰/۵',
+          lCm: 200, wCm: 100, hCm: 50,
+          volM3: 1,
+          volCm3: 1000000,
+          targetUnit: 'سانتی‌متر مکعب (cm³)',
+          story: 'یک مخزن سوخت فضاپیما با ابعاد طول ۲ متر، عرض ۱ متر و ارتفاع ۰/۵ متر در بخش انبار نصب شده است.',
+          hint: '۲ متر = ۲۰۰ سانتی‌متر، ۱ متر = ۱۰۰ سانتی‌متر، ۰/۵ متر = ۵۰ سانتی‌متر ⬅️ ۲۰۰ × ۱۰۰ × ۵۰ = ۱,۰۰۰,۰۰۰ سانتی‌متر مکعب (یا ۱ متر مکعب = ۱,۰۰۰,۰۰۰ سانتی‌متر مکعب).'
+        },
+        {
+          name: 'کپسول هوای بخش زیستی',
+          lM: 1, wM: 0.4, hM: 0.2,
+          lStr: '۱', wStr: '۰/۴', hStr: '۰/۲',
+          lCm: 100, wCm: 40, hCm: 20,
+          volM3: 0.08,
+          volCm3: 80000,
+          targetUnit: 'سانتی‌متر مکعب (cm³)',
+          story: 'ابعاد یک محفظه ذخیره هوا برابر است با: طول ۱ متر، عرض ۰/۴ متر و ارتفاع ۰/۲ متر.',
+          hint: '۱ متر = ۱۰۰ سانتی‌متر، ۰/۴ متر = ۴۰ سانتی‌متر، ۰/۲ متر = ۲۰ سانتی‌متر ⬅️ ۱۰۰ × ۴۰ × ۲۰ = ۸۰,۰۰۰ سانتی‌متر مکعب.'
+        },
+        {
+          name: 'تانکر آب اضطراری سفینه',
+          lM: 2, wM: 0.5, hM: 0.3,
+          lStr: '۲', wStr: '۰/۵', hStr: '۰/۳',
+          lCm: 200, wCm: 50, hCm: 30,
+          volM3: 0.3,
+          volCm3: 300000,
+          targetUnit: 'سانتی‌متر مکعب (cm³)',
+          story: 'یک تانکر آب اضطراری به طول ۲ متر، عرض ۰/۵ متر و ارتفاع ۰/۳ متر در ایستگاه پشتیبانی ساخته شده است.',
+          hint: '۲ متر = ۲۰۰ سانتی‌متر، ۰/۵ متر = ۵۰ سانتی‌متر، ۰/۳ متر = ۳۰ سانتی‌متر ⬅️ ۲۰۰ × ۵۰ × ۳۰ = ۳۰۰,۰۰۰ سانتی‌متر مکعب.'
+        },
+        {
+          name: 'جعبه ابزار ربات کاوشگر',
+          lM: 0.5, wM: 0.4, hM: 0.3,
+          lStr: '۰/۵', wStr: '۰/۴', hStr: '۰/۳',
+          lCm: 50, wCm: 40, hCm: 30,
+          volM3: 0.06,
+          volCm3: 60000,
+          targetUnit: 'سانتی‌متر مکعب (cm³)',
+          story: 'ابعاد جعبه ابزار مکانیکی ربات: طول ۰/۵ متر، عرض ۰/۴ متر و ارتفاع ۰/۳ متر است.',
+          hint: '۰/۵ متر = ۵۰ سانتی‌متر، ۰/۴ متر = ۴۰ سانتی‌متر، ۰/۳ متر = ۳۰ سانتی‌متر ⬅️ ۵۰ × ۴۰ × ۳۰ = ۶۰,۰۰۰ سانتی‌متر مکعب.'
+        },
+        {
+          name: 'محفظه باتری پلاسما',
+          lM: 1.5, wM: 1, hM: 0.4,
+          lStr: '۱/۵', wStr: '۱', hStr: '۰/۴',
+          lCm: 150, wCm: 100, hCm: 40,
+          volM3: 0.6,
+          volCm3: 600000,
+          targetUnit: 'سانتی‌متر مکعب (cm³)',
+          story: 'محفظه باتری پلاسما با ابعاد طول ۱/۵ متر، عرض ۱ متر و ارتفاع ۰/۴ متر طراحی شده است.',
+          hint: '۱/۵ متر = ۱۵۰ سانتی‌متر، ۱ متر = ۱۰۰ سانتی‌متر، ۰/۴ متر = ۴۰ سانتی‌متر ⬅️ ۱۵۰ × ۱۰۰ × ۴۰ = ۶۰۰,۰۰۰ سانتی‌متر مکعب.'
+        },
+        {
+          name: 'انبار نمونه‌های سنگین سیاره',
+          lM: 3, wM: 2, hM: 1,
+          lStr: '۳', wStr: '۲', hStr: '۱',
+          lCm: 300, wCm: 200, hCm: 100,
+          volM3: 6,
+          volCm3: 6000000,
+          targetUnit: 'سانتی‌متر مکعب (cm³)',
+          story: 'ابعاد انبار نمونه‌های زمین‌شناسی: طول ۳ متر، عرض ۲ متر و ارتفاع ۱ متر است.',
+          hint: 'حجم به متر مکعب = ۳ × ۲ × ۱ = ۶ متر مکعب. چون هر متر مکعب ۱,۰۰۰,۰۰۰ سانتی‌متر مکعب است ⬅️ ۶ × ۱,۰۰۰,۰۰۰ = ۶,۰۰۰,۰۰۰ سانتی‌متر مکعب.'
+        },
+        {
+          name: 'کانتینر تجهیزات آزمایشگاهی',
+          lM: 2, wM: 1.5, hM: 1,
+          lStr: '۲', wStr: '۱/۵', hStr: '۱',
+          lCm: 200, wCm: 150, hCm: 100,
+          volM3: 3,
+          volCm3: 3000000,
+          targetUnit: 'سانتی‌متر مکعب (cm³)',
+          story: 'کانتینر تجهیزات با ابعاد طول ۲ متر، عرض ۱/۵ متر و ارتفاع ۱ متر آماده کالیبراسیون است.',
+          hint: '۲ متر = ۲۰۰ سانتی‌متر، ۱/۵ متر = ۱۵۰ سانتی‌متر، ۱ متر = ۱۰۰ سانتی‌متر ⬅️ ۲۰۰ × ۱۵۰ × ۱۰۰ = ۳,۰۰۰,۰۰۰ سانتی‌متر مکعب.'
+        }
+      ];
+      const chosenScenario = volumeScenarios[Math.floor(Math.random() * volumeScenarios.length)];
+      setVolQuestion(chosenScenario);
+      setShowUnitGuide(false);
+      setAnsVol('');
+    }
   };
 
   const handleStartGame = () => {
     SoundFX.success();
     setInGame(true);
     setScore(0);
-    generateQuestion();
+    generateQuestionForStage(0);
   };
 
-  const simulateCut = () => {
-    SoundFX.click();
-    setIsSimulated(true);
+  const advanceStage = () => {
+    SoundFX.success();
+    SoundFX.lifeEnergy();
+    const nextScore = score + 1;
+    setScore(nextScore);
+    onCorrectAnswer(20);
+    setShowCelebration(true);
+
+    if (nextScore >= TOTAL_STAGES) {
+      setTimeout(() => {
+        onComplete();
+      }, 1500);
+    } else {
+      setTimeout(() => {
+        generateQuestionForStage(nextScore);
+      }, 1400);
+    }
   };
 
-  const checkAnswer = () => {
-    const val1 = parseFloat(toEnglishNumber(in1));
-    const val2 = parseFloat(toEnglishNumber(in2));
-    const val3 = parseFloat(toEnglishNumber(in3));
-    const valAns = parseFloat(toEnglishNumber(inAns));
-
-    if (isNaN(val1) || isNaN(val2) || isNaN(valAns)) {
-      SoundFX.error();
-      setFeedback({ type: 'error', message: 'لطفاً تمام ورودی‌های فرمول را با دقت پر کنید.' });
-      return;
-    }
-
-    let valuesValid = false;
-    if (q.type === 'rhombus') {
-      valuesValid =
-        (val1 === q.d1 && val2 === q.d2) ||
-        (val1 === q.d2 && val2 === q.d1);
-    } else {
-      if (isNaN(val3)) {
-        SoundFX.error();
-        setFeedback({ type: 'error', message: 'ارتفاع ذوزنقه را وارد نکرده‌اید.' });
-        return;
-      }
-      valuesValid =
-        ((val1 === q.b1 && val2 === q.b2) || (val1 === q.b2 && val2 === q.b1)) &&
-        val3 === q.h;
-    }
-
-    if (!valuesValid) {
-      SoundFX.error();
-      onLogMistake();
-      setFeedback({
-        type: 'error',
-        message: 'اعداد برداشته شده از شکل در جایگاه درستی در فرمول قرار نگرفته‌اند. اندازه اضلاع و قطرها را بررسی کنید.',
-      });
-      return;
-    }
-
-    if (valAns === q.area) {
-      SoundFX.success();
-      SoundFX.lifeEnergy();
-      const newScore = score + 1;
-      setScore(newScore);
-
-      onCorrectAnswer(20);
-      setShowCelebration(true);
-
-      setFeedback({
-        type: 'success',
-        message: `پنل سازه برش خورد و نصب شد! مرحله ${toPersianDigits(newScore)} از ${toPersianDigits(TOTAL_STAGES)} با موفقیت تایید گردید.`,
-      });
-
-      if (newScore >= TOTAL_STAGES) {
-        setTimeout(() => {
-          onComplete();
-        }, 1500);
-      } else {
-        setTimeout(() => {
-          generateQuestion();
-        }, 1600);
-      }
-    } else {
-      SoundFX.error();
-      onLogMistake();
-      setFeedback({
-        type: 'error',
-        message: `مساحت اشتباه محاسبه شد! آیا تقسیم بر ۲ را فراموش کرده‌اید؟ مساحت صحیح: ${toPersianDigits(q.area)} متر مربع.`,
-      });
+  // Helper info for current symmetry shape
+  const getSymmetryInfo = () => {
+    switch (symShape) {
+      case 'parallelogram':
+        return { name: 'متوازی‌الاضلاع', hasCentral: true, hint: 'با ۱۸۰ درجه چرخش دقیقاً روی خودش منطبق می‌شود.' };
+      case 'circle':
+        return { name: 'دایره', hasCentral: true, hint: 'دایره حول مرکز خود تقارن مرکزی کامل دارد.' };
+      case 'letter_N':
+        return { name: 'حرف انگلیسی N', hasCentral: true, hint: 'اگر حرف N را ۱۸۰ درجه بچرخانید دوباره به همان شکل N دیده می‌شود.' };
+      case 'equilateral_triangle':
+        return { name: 'مثلث متساوی‌الاضلاع', hasCentral: false, hint: 'مثلث با ۱۸۰ درجه چرخش نوک آن به سمت پایین می‌افتد و روی خودش منطبق نمی‌شود!' };
+      case 'trapezoid':
+        return { name: 'ذوزنقه', hasCentral: false, hint: 'قاعده کوچک و بزرگ ذوزنقه با ۱۸۰ درجه چرخش جابه‌جا می‌شوند.' };
     }
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto space-y-6">
+    <div className="space-y-6 animate-fadeIn text-right" dir="rtl">
       <div className="flex items-center justify-between">
         <button
           onClick={() => {
             SoundFX.click();
             onBack();
           }}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors text-sm"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-sm active:scale-95 transition-all"
         >
           <ArrowRight className="w-4 h-4" />
           <span>بازگشت به عرشه</span>
@@ -199,33 +338,31 @@ export function GeometryModule({
               <Zap className="w-3.5 h-3.5 text-emerald-400" />
               <span>پاداش: +۲۰ انرژی</span>
             </div>
-
-            <div className="px-4 py-1.5 rounded-xl bg-cyan-950/60 border border-cyan-500/40 text-cyan-300 text-sm font-semibold tabular-nums">
-              مرحله: {toPersianDigits(score)} / {toPersianDigits(TOTAL_STAGES)}
+            <div className="px-4 py-1.5 rounded-xl bg-pink-950/60 border border-pink-500/40 text-pink-300 text-sm font-semibold tabular-nums">
+              مرحله: {toPersianDigits(score + 1)} / {toPersianDigits(TOTAL_STAGES)}
             </div>
           </div>
         )}
       </div>
 
-      <div
-        className="p-6 md:p-8 rounded-3xl bg-slate-900/90 border border-cyan-500/30 backdrop-blur-md shadow-2xl relative overflow-hidden"
-        style={{
-          backgroundImage: 'radial-gradient(circle at top right, rgba(236, 72, 153, 0.12), transparent 50%)',
-        }}
-      >
-        <h2 className="text-xl md:text-2xl font-bold text-cyan-300 mb-4">
-          کارگاه سازه‌ها: مساحت اشکال هندسی (۱۵ مرحله)
+      <div className="p-6 md:p-8 rounded-3xl bg-slate-900/90 border border-pink-500/30 backdrop-blur-md shadow-2xl relative overflow-hidden">
+        <h2 className="text-xl md:text-2xl font-bold text-pink-300 mb-2 flex items-center gap-2">
+          <Shapes className="w-6 h-6 text-pink-400" />
+          <span>کارگاه سازه‌ها: ۵ گلوگاه مفهومی هندسه</span>
         </h2>
+        <p className="text-xs text-slate-400 mb-6">
+          تقارن مرکزی اشکال متنوع، مجموع زوایا، مساحت لوزی و ذوزنقه، تله شعاع در محیط دایره و گنجایش مکعب‌مستطیل
+        </p>
 
         {!inGame ? (
           <div className="space-y-6">
-            <RobotGuide
-              message={lessonSlides[slide].text}
-              mood={lessonSlides[slide].mood}
-              size="md"
-            />
+            <div className="p-4 rounded-2xl bg-pink-950/30 border border-pink-500/30 text-pink-200 font-bold text-base">
+              📖 {lessonSlides[slide].title}
+            </div>
 
-            <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 text-center text-sm text-cyan-300">
+            <RobotGuide message={lessonSlides[slide].text} mood={lessonSlides[slide].mood} size="md" />
+
+            <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 text-sm text-pink-300">
               💡 {lessonSlides[slide].tip}
             </div>
 
@@ -246,7 +383,7 @@ export function GeometryModule({
                   <div
                     key={idx}
                     className={`w-2.5 h-2.5 rounded-full transition-all ${
-                      idx === slide ? 'bg-cyan-400 w-6 shadow-sm shadow-cyan-400' : 'bg-slate-700'
+                      idx === slide ? 'bg-pink-400 w-6 shadow-sm shadow-pink-400' : 'bg-slate-700'
                     }`}
                   />
                 ))}
@@ -258,277 +395,436 @@ export function GeometryModule({
                     SoundFX.click();
                     setSlide((s) => s + 1);
                   }}
-                  className="px-5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold text-sm transition-all"
+                  className="px-5 py-2 rounded-xl bg-pink-500 hover:bg-pink-400 text-slate-950 font-semibold text-sm transition-all"
                 >
                   اسلاید بعدی
                 </button>
               ) : (
                 <button
                   onClick={handleStartGame}
-                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-bold text-sm shadow-lg shadow-cyan-500/20 active:scale-95 transition-all"
+                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-l from-pink-500 to-rose-500 hover:from-pink-400 hover:to-rose-400 text-white font-bold text-sm shadow-lg active:scale-95 transition-all"
                 >
                   <Sparkles className="w-4 h-4" />
-                  <span>ورود به کارگاه برش سازه</span>
+                  <span>آغاز عملیات ۱۵ مرحله‌ای سازه‌ها</span>
                 </button>
               )}
             </div>
           </div>
         ) : (
           <div className="space-y-6">
-            <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 text-slate-200 text-sm md:text-base leading-relaxed">
-              {q.type === 'rhombus' ? (
-                <span>
-                  سازه مورد نیاز: <strong className="text-pink-400">لوزی</strong> با قطر بزرگ{' '}
-                  <strong className="text-cyan-300">{toPersianDigits(q.d1)} متر</strong> و قطر کوچک{' '}
-                  <strong className="text-cyan-300">{toPersianDigits(q.d2)} متر</strong>. ابتدا روی دکمه شبیه‌سازی لیزری بزنید تا ارتباط با مستطیل محیطی را ببینید.
-                </span>
-              ) : (
-                <span>
-                  سازه مورد نیاز: <strong className="text-amber-400">ذوزنقه</strong> با قاعده کوچک{' '}
-                  <strong className="text-cyan-300">{toPersianDigits(q.b1)} متر</strong>، قاعده بزرگ{' '}
-                  <strong className="text-cyan-300">{toPersianDigits(q.b2)} متر</strong> و ارتفاع{' '}
-                  <strong className="text-cyan-300">{toPersianDigits(q.h)} متر</strong>. دکمه شبیه‌سازی را بزنید تا چرخش ۱۸۰ درجه ذوزنقه دوم و ساخت متوازی‌الاضلاع کامل را ببینید.
-                </span>
-              )}
-            </div>
-
-            <div className="p-6 rounded-3xl bg-slate-950/90 border border-pink-500/30 flex flex-col items-center gap-6">
-              <button
-                disabled={isSimulated}
-                onClick={simulateCut}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-400 hover:to-rose-400 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-sm shadow-lg shadow-pink-500/20 active:scale-95 transition-all"
-              >
-                <Scissors className="w-4 h-4" />
-                <span>۱. شبیه‌سازی بُرش و اتصال لیزری ✂️</span>
-              </button>
-
-              <div className="w-full max-w-2xl h-64 rounded-2xl bg-slate-900/60 border border-slate-800 p-2 flex items-center justify-center overflow-hidden">
-                <svg viewBox="0 0 540 240" className="w-full h-full">
-                  {q.type === 'rhombus' ? (
-                    <g>
-                      {/* Enclosing rectangle when simulated */}
-                      {isSimulated && (
-                        <>
-                          <rect
-                            x="120"
-                            y="40"
-                            width="280"
-                            height="140"
-                            fill="none"
-                            stroke="#38bdf8"
-                            strokeWidth="2"
-                            strokeDasharray="6 6"
-                          />
-                          {/* 4 outer corner triangles demonstrating equal cut areas */}
-                          <polygon points="120,40 260,40 120,110" fill="rgba(244, 114, 182, 0.25)" />
-                          <polygon points="260,40 400,40 400,110" fill="rgba(244, 114, 182, 0.25)" />
-                          <polygon points="120,110 120,180 260,180" fill="rgba(244, 114, 182, 0.25)" />
-                          <polygon points="400,110 260,180 400,180" fill="rgba(244, 114, 182, 0.25)" />
-                        </>
-                      )}
-
-                      {/* Main Rhombus */}
-                      <polygon
-                        points="260,40 400,110 260,180 120,110"
-                        fill="rgba(236, 72, 153, 0.45)"
-                        stroke="#f472b6"
-                        strokeWidth="3"
-                      />
-
-                      {/* Diagonals */}
-                      <line x1="120" y1="110" x2="400" y2="110" stroke="#00f0ff" strokeWidth="2" strokeDasharray="4 4" />
-                      <line x1="260" y1="40" x2="260" y2="180" stroke="#00f0ff" strokeWidth="2" strokeDasharray="4 4" />
-
-                      <text x="260" y="202" fill="#38bdf8" fontSize="13" textAnchor="middle" fontWeight="bold">
-                        قطر بزرگ = {toPersianDigits(q.d1)} متر
-                      </text>
-                      <text x="450" y="115" fill="#38bdf8" fontSize="13" textAnchor="middle" fontWeight="bold">
-                        قطر کوچک = {toPersianDigits(q.d2)} متر
-                      </text>
-                    </g>
-                  ) : (
-                    /* GEOMETRICALLY CORRECT TRAPEZOID DUPLICATION & ROTATION (PARALLELOGRAM) */
-                    <g>
-                      {/* Geometric coordinates:
-                          Original Trapezoid:
-                          A (top left) = (110, 50)
-                          B (top right) = (210, 50)  -> top base = 100 px (b1)
-                          C (bottom right) = (290, 170) -> bottom base = 240 px (b2)
-                          D (bottom left) = (50, 170)
-                          Height = 120 px (h)
-
-                          Second identical trapezoid inverted & rotated 180 degrees:
-                          Placed adjacent along the shared slant edge BC (from B to C):
-                          Top edge expands from B (210, 50) to (210 + 240 = 450, 50) -> length = b2!
-                          Bottom edge expands from C (290, 170) to (290 + 100 = 390, 170) -> length = b1!
-                          Opposite right slant edge connects (450, 50) to (390, 170) which is parallel to AD (50,170 -> 110,50)!
-                          Total top width = b1 + b2 = 100 + 240 = 340 px!
-                          Total bottom width = b2 + b1 = 240 + 100 = 340 px!
-                          Together they form a PERFECT PARALLELOGRAM with base = (b1 + b2) and height = h!
-                      */}
-
-                      {/* Parallelogram outer boundary highlight when simulated */}
-                      {isSimulated && (
-                        <polygon
-                          points="110,50 450,50 390,170 50,170"
-                          fill="none"
-                          stroke="#38bdf8"
-                          strokeWidth="2"
-                          strokeDasharray="6 6"
-                        />
-                      )}
-
-                      {/* Original Trapezoid 1 */}
-                      <polygon
-                        points="110,50 210,50 290,170 50,170"
-                        fill="rgba(245, 158, 11, 0.45)"
-                        stroke="#f59e0b"
-                        strokeWidth="3"
-                      />
-
-                      {/* Height guide line with right-angle indicator */}
-                      <line x1="110" y1="50" x2="110" y2="170" stroke="#00f0ff" strokeWidth="2" strokeDasharray="3 3" />
-                      <rect x="110" y="160" width="10" height="10" fill="none" stroke="#00f0ff" strokeWidth="1.5" />
-
-                      {/* Inverted Cloned Trapezoid 2 (Appears seamlessly attached to create a parallelogram) */}
-                      {isSimulated && (
-                        <g className="transition-all duration-1000 animate-fadeIn">
-                          <polygon
-                            points="210,50 450,50 390,170 290,170"
-                            fill="rgba(56, 189, 248, 0.35)"
-                            stroke="#38bdf8"
-                            strokeWidth="2.5"
-                          />
-                          {/* Inner shared dividing line */}
-                          <line x1="210" y1="50" x2="290" y2="170" stroke="#ffffff" strokeWidth="2" strokeDasharray="4 4" />
-
-                          {/* Labels for the cloned inverted parts showing b2 on top and b1 on bottom */}
-                          <text x="330" y="42" fill="#38bdf8" fontSize="12" textAnchor="middle" fontWeight="bold">
-                            قاعده بزرگ ({toPersianDigits(q.b2)})
-                          </text>
-                          <text x="340" y="190" fill="#38bdf8" fontSize="12" textAnchor="middle" fontWeight="bold">
-                            قاعده کوچک ({toPersianDigits(q.b1)})
-                          </text>
-
-                          {/* Top unified parallelogram dimension banner */}
-                          <text x="280" y="24" fill="#34d399" fontSize="13" textAnchor="middle" fontWeight="bold">
-                            قاعده کل متوازی‌الاضلاع = ({toPersianDigits(q.b1)} + {toPersianDigits(q.b2)} = {toPersianDigits(q.b1 + q.b2)}) متر
-                          </text>
-                        </g>
-                      )}
-
-                      {/* Original labels */}
-                      <text x="160" y="42" fill="#fde68a" fontSize="13" textAnchor="middle" fontWeight="bold">
-                        قاعده کوچک = {toPersianDigits(q.b1)}
-                      </text>
-                      <text x="170" y="190" fill="#fde68a" fontSize="13" textAnchor="middle" fontWeight="bold">
-                        قاعده بزرگ = {toPersianDigits(q.b2)}
-                      </text>
-                      <text x="80" y="115" fill="#00f0ff" fontSize="13" textAnchor="middle" fontWeight="bold">
-                        ارتفاع = {toPersianDigits(q.h)}
-                      </text>
-                    </g>
-                  )}
-                </svg>
-              </div>
-
-              {/* Informative explanation banner during simulation */}
-              {isSimulated && q.type === 'trapezoid' && (
-                <div className="p-3 rounded-xl bg-cyan-950/70 border border-cyan-500/40 text-cyan-200 text-xs text-center max-w-lg animate-fadeIn">
-                  ✨ <strong>مشاهده کردید؟</strong> ذوزنقه دوم (آبی‌رنگ) با چرخش ۱۸۰ درجه دقیقا در کنار ذوزنقه اول قرار گرفت و یک <strong>متوازی‌الاضلاع</strong> ساخت که قاعده‌اش برابر با <span className="text-amber-300 font-bold">({toPersianDigits(q.b1)} + {toPersianDigits(q.b2)})</span> است. چون مساحت متوازی‌الاضلاع برابر با (قاعده × ارتفاع) است، مساحت یک ذوزنقه دقیقاً <strong>نصف</strong> آن می‌شود: <span className="text-emerald-300 font-bold">((قاعده کوچک + قاعده بزرگ) × ارتفاع) ÷ ۲</span>.
-                </div>
-              )}
-
-              {/* Step 2: Interactive Formula Insertion */}
-              {isSimulated && (
-                <div className="w-full space-y-4 pt-4 border-t border-slate-800 animate-fadeIn text-center">
-                  <div className="text-xs md:text-sm text-cyan-300 font-medium">
-                    مقادیر را در فرمول قرار داده و مساحت نهایی را محاسبه کنید:
+            {/* SUB-TOPIC 1: RHOMBUS & TRAPEZOID */}
+            {subTopic === 'rhombus_trapezoid' && (
+              <div className="space-y-6">
+                <div className="p-5 rounded-2xl bg-slate-950/80 border border-slate-800 text-center space-y-2">
+                  <div className="text-xs text-slate-400">
+                    مساحت {geoQ.type === 'rhombus' ? 'لوزی' : 'ذوزنقه'} با شبیه‌سازی لیزری:
                   </div>
-
-                  <div className="flex items-center justify-center flex-wrap gap-2 text-lg md:text-xl font-mono text-white" dir="ltr">
-                    {q.type === 'rhombus' ? (
-                      <>
-                        <span>(</span>
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          placeholder="قطر"
-                          value={in1}
-                          onChange={(e) => setIn1(e.target.value)}
-                          className="w-16 h-10 text-center font-bold bg-slate-900 border border-pink-500 rounded-lg text-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 placeholder:text-xs"
-                        />
-                        <span>×</span>
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          placeholder="قطر"
-                          value={in2}
-                          onChange={(e) => setIn2(e.target.value)}
-                          className="w-16 h-10 text-center font-bold bg-slate-900 border border-pink-500 rounded-lg text-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 placeholder:text-xs"
-                        />
-                        <span>) ÷ ۲ =</span>
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          placeholder="مساحت؟"
-                          value={inAns}
-                          onChange={(e) => setInAns(e.target.value)}
-                          className="w-24 h-11 text-center font-bold bg-slate-900 border-2 border-cyan-400 rounded-xl text-cyan-200 focus:outline-none focus:ring-2 focus:ring-cyan-300 placeholder:text-xs"
-                        />
-                      </>
+                  <div className="text-sm md:text-base text-slate-200">
+                    {geoQ.type === 'rhombus' ? (
+                      <span>
+                        قطر بزرگ = <strong className="text-cyan-400">{toPersianDigits(geoQ.d1)}</strong> و قطر کوچک = <strong className="text-cyan-400">{toPersianDigits(geoQ.d2)}</strong> متر
+                      </span>
                     ) : (
-                      <>
-                        <span>( (</span>
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          placeholder="قاعده"
-                          value={in1}
-                          onChange={(e) => setIn1(e.target.value)}
-                          className="w-16 h-10 text-center font-bold bg-slate-900 border border-amber-500 rounded-lg text-amber-200 focus:outline-none focus:ring-2 focus:ring-amber-400 placeholder:text-xs"
-                        />
-                        <span>+</span>
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          placeholder="قاعده"
-                          value={in2}
-                          onChange={(e) => setIn2(e.target.value)}
-                          className="w-16 h-10 text-center font-bold bg-slate-900 border border-amber-500 rounded-lg text-amber-200 focus:outline-none focus:ring-2 focus:ring-amber-400 placeholder:text-xs"
-                        />
-                        <span>) ×</span>
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          placeholder="ارتفاع"
-                          value={in3}
-                          onChange={(e) => setIn3(e.target.value)}
-                          className="w-16 h-10 text-center font-bold bg-slate-900 border border-cyan-500 rounded-lg text-cyan-200 focus:outline-none focus:ring-2 focus:ring-cyan-400 placeholder:text-xs"
-                        />
-                        <span>) ÷ ۲ =</span>
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          placeholder="مساحت؟"
-                          value={inAns}
-                          onChange={(e) => setInAns(e.target.value)}
-                          className="w-24 h-11 text-center font-bold bg-slate-900 border-2 border-cyan-400 rounded-xl text-cyan-200 focus:outline-none focus:ring-2 focus:ring-cyan-300 placeholder:text-xs"
-                        />
-                      </>
+                      <span>
+                        قاعده بزرگ = <strong className="text-cyan-400">{toPersianDigits(geoQ.b2)}</strong>، قاعده کوچک = <strong className="text-cyan-400">{toPersianDigits(geoQ.b1)}</strong> و ارتفاع = <strong className="text-amber-400">{toPersianDigits(geoQ.h)}</strong> متر
+                      </span>
                     )}
                   </div>
+                </div>
+
+                <div className="p-6 rounded-3xl bg-slate-950/90 border border-pink-500/30 flex flex-col items-center gap-4">
+                  <button
+                    onClick={() => {
+                      SoundFX.laser();
+                      setIsSimulated(true);
+                    }}
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-pink-600 hover:bg-pink-500 text-white font-bold text-xs shadow-md active:scale-95 transition-all"
+                  >
+                    <Scissors className="w-4 h-4" />
+                    <span>✂️ ۱. شبیه‌سازی برش لیزری و نمایش شکل دوبرابر</span>
+                  </button>
+
+                  <div className="w-full max-w-xl h-56 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center p-2 overflow-hidden">
+                    <svg viewBox="0 0 500 220" className="w-full h-full">
+                      {geoQ.type === 'rhombus' ? (
+                        <g>
+                          {isSimulated && (
+                            <>
+                              <rect x="100" y="30" width="300" height="150" fill="none" stroke="#38bdf8" strokeWidth="2" strokeDasharray="6 6" />
+                              <polygon points="100,30 250,30 100,105" fill="rgba(244, 114, 182, 0.2)" />
+                              <polygon points="250,30 400,30 400,105" fill="rgba(244, 114, 182, 0.2)" />
+                              <polygon points="100,105 100,180 250,180" fill="rgba(244, 114, 182, 0.2)" />
+                              <polygon points="400,105 250,180 400,180" fill="rgba(244, 114, 182, 0.2)" />
+                            </>
+                          )}
+                          <polygon points="250,30 400,105 250,180 100,105" fill="rgba(236, 72, 153, 0.55)" stroke="#f472b6" strokeWidth="3" />
+                          <line x1="100" y1="105" x2="400" y2="105" stroke="#00f0ff" strokeWidth="2" strokeDasharray="4 4" />
+                          <line x1="250" y1="30" x2="250" y2="180" stroke="#00f0ff" strokeWidth="2" strokeDasharray="4 4" />
+                          <text x="250" y="205" fill="#38bdf8" fontSize="13" textAnchor="middle" fontWeight="bold">
+                            قطر بزرگ = {toPersianDigits(geoQ.d1)} متر
+                          </text>
+                          <text x="445" y="110" fill="#38bdf8" fontSize="13" textAnchor="middle" fontWeight="bold">
+                            قطر کوچک = {toPersianDigits(geoQ.d2)} متر
+                          </text>
+                        </g>
+                      ) : (
+                        <g>
+                          {isSimulated && (
+                            <polygon points="200,45 420,45 360,165 260,165" fill="rgba(56, 189, 248, 0.35)" stroke="#38bdf8" strokeWidth="2" strokeDasharray="4 4" />
+                          )}
+                          <polygon points="100,45 200,45 260,165 40,165" fill="rgba(236, 72, 153, 0.6)" stroke="#f472b6" strokeWidth="3" />
+                          <line x1="100" y1="45" x2="100" y2="165" stroke="#fbbf24" strokeWidth="2" strokeDasharray="3 3" />
+                          <text x="150" y="35" fill="#f472b6" fontSize="12" textAnchor="middle" fontWeight="bold">قاعده کوچک = {toPersianDigits(geoQ.b1)}</text>
+                          <text x="150" y="185" fill="#f472b6" fontSize="12" textAnchor="middle" fontWeight="bold">قاعده بزرگ = {toPersianDigits(geoQ.b2)}</text>
+                          <text x="80" y="110" fill="#fbbf24" fontSize="12" textAnchor="middle" fontWeight="bold">ارتفاع = {toPersianDigits(geoQ.h)}</text>
+                        </g>
+                      )}
+                    </svg>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-center gap-4 p-4 rounded-2xl bg-slate-950/70 border border-slate-800">
+                  <span className="text-sm text-slate-300 font-semibold">مساحت شکل (متر مربع):</span>
+                  <input
+                    type="text"
+                    placeholder="مساحت..."
+                    value={ansArea}
+                    onChange={(e) => setAnsArea(e.target.value)}
+                    className="w-32 h-12 text-center text-xl font-bold bg-slate-900 border border-pink-500/60 rounded-xl text-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400"
+                  />
 
                   <button
-                    onClick={checkAnswer}
-                    className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-pink-500 to-cyan-500 hover:from-pink-400 hover:to-cyan-400 text-slate-950 font-bold text-sm shadow-lg shadow-pink-500/20 active:scale-95 transition-all mx-auto mt-4"
+                    onClick={() => {
+                      const uAns = parseFloat(toEnglishNumber(ansArea));
+                      if (Math.abs(uAns - geoQ.area) < 0.1) {
+                        setFeedback({ type: 'success', message: 'مساحت کاملاً دقیق محاسبه شد!' });
+                        advanceStage();
+                      } else {
+                        onLogMistake();
+                        SoundFX.error();
+                        setFeedback({
+                          type: 'error',
+                          message: `راهنمایی: دقت کنید که آیا تقسیم بر ۲ را اعمال کرده‌اید؟ فرمول ${geoQ.type === 'rhombus' ? '(قطر بزرگ × قطر کوچک) ÷ ۲' : '((مجموع دو قاعده) × ارتفاع) ÷ ۲'} را دوباره محاسبه کنید.`,
+                        });
+                      }
+                    }}
+                    className="px-6 py-3 rounded-xl bg-gradient-to-l from-pink-500 to-rose-500 hover:from-pink-400 hover:to-rose-400 text-white font-bold text-sm shadow-lg active:scale-95 transition-all"
                   >
-                    <Check className="w-4 h-4" />
-                    <span>تایید مساحت و برش سازه</span>
+                    تایید مساحت 🎯
                   </button>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
+
+            {/* SUB-TOPIC 2: CIRCLE PERIMETER & PI (RADIUS TRAP) */}
+            {subTopic === 'circle_perimeter' && (
+              <div className="space-y-6">
+                <div className="p-5 rounded-2xl bg-slate-950/80 border border-slate-800 text-center space-y-2">
+                  <div className="text-xs text-slate-400">محیط سپر حلقوی سفینه با عدد پی (ص ۱۱۰ تا ۱۱۲):</div>
+                  <div className="text-base md:text-lg text-white font-semibold">
+                    {circleGiven === 'radius' ? (
+                      <span>
+                        شعاع سپر دایره‌ای برابر <strong className="text-amber-400">{toPersianDigits(circleVal)} متر</strong> است. محیط دایره چقدر است؟ (عدد پی = ۳/۱۴)
+                      </span>
+                    ) : (
+                      <span>
+                        قطر سپر دایره‌ای برابر <strong className="text-cyan-400">{toPersianDigits(circleVal)} متر</strong> است. محیط دایره چقدر است؟ (عدد پی = ۳/۱۴)
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-rose-300 font-semibold">
+                    ⚠️ هشدار: مراقب تفاوت شعاع و قطر در فرمول محیط دایره باشید!
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-center gap-4 p-4 rounded-2xl bg-slate-950/70 border border-slate-800">
+                  <span className="text-sm text-slate-300 font-semibold">محیط دایره (متر):</span>
+                  <input
+                    type="text"
+                    placeholder="محیط..."
+                    value={ansPerimeter}
+                    onChange={(e) => setAnsPerimeter(e.target.value)}
+                    className="w-36 h-12 text-center text-xl font-bold bg-slate-900 border border-pink-500/60 rounded-xl text-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400"
+                  />
+
+                  <button
+                    onClick={() => {
+                      const uAns = parseFloat(toEnglishNumber(ansPerimeter));
+                      const exp = parseFloat(circlePerimeter);
+                      if (Math.abs(uAns - exp) < 0.2) {
+                        setFeedback({ type: 'success', message: 'احسنت! در دام شعاع نیفتادید و محیط با ضرب در قطر دقیق به دست آمد.' });
+                        advanceStage();
+                      } else {
+                        onLogMistake();
+                        SoundFX.error();
+                        setFeedback({
+                          type: 'error',
+                          message: `راهنمایی: فرمول محیط دایره برابر (قطر × ۳/۱۴) است. اگر شعاع به شما داده شده، ابتدا آن را ۲ برابر کنید!`,
+                        });
+                      }
+                    }}
+                    className="px-6 py-3 rounded-xl bg-gradient-to-l from-pink-500 to-rose-500 hover:from-pink-400 hover:to-rose-400 text-white font-bold text-sm shadow-lg active:scale-95 transition-all"
+                  >
+                    تایید محیط دایره 🎯
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* SUB-TOPIC 3: ANGLES & BISECTOR */}
+            {subTopic === 'angles_bisector' && (
+              <div className="space-y-6">
+                <div className="p-5 rounded-2xl bg-slate-950/80 border border-slate-800 text-center space-y-2">
+                  <div className="text-xs text-slate-400">مجموع زوایای {angleType === 'triangle' ? 'مثلث (۱۸۰ درجه)' : 'چهارضلعی (۳۶۰ درجه)'}:</div>
+                  <div className="text-base md:text-lg text-white font-semibold">
+                    {angleType === 'triangle' ? (
+                      <span>در یک مثلث، دو زاویه <strong className="text-cyan-400">{toPersianDigits(ang1)}°</strong> و <strong className="text-cyan-400">{toPersianDigits(ang2)}°</strong> هستند. زاویه سوم چند درجه است؟</span>
+                    ) : (
+                      <span>در یک چهارضلعی، سه زاویه <strong className="text-cyan-400">{toPersianDigits(ang1)}°</strong>، <strong className="text-cyan-400">{toPersianDigits(ang2)}°</strong> و <strong className="text-cyan-400">{toPersianDigits(ang3)}°</strong> هستند. زاویه چهارم چند درجه است؟</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-center gap-4 p-4 rounded-2xl bg-slate-950/70 border border-slate-800">
+                  <span className="text-sm text-slate-300 font-semibold">اندازه زاویه مجهول (درجه):</span>
+                  <input
+                    type="text"
+                    placeholder="درجه..."
+                    value={userAngle}
+                    onChange={(e) => setUserAngle(e.target.value)}
+                    className="w-28 h-12 text-center text-xl font-bold bg-slate-900 border border-pink-500/60 rounded-xl text-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400"
+                  />
+
+                  <button
+                    onClick={() => {
+                      const u = parseInt(toEnglishNumber(userAngle), 10);
+                      if (u === missingAngle) {
+                        setFeedback({ type: 'success', message: 'عالی بود! قانون مجموع زوایا به درستی اعمال شد.' });
+                        advanceStage();
+                      } else {
+                        onLogMistake();
+                        SoundFX.error();
+                        setFeedback({
+                          type: 'error',
+                          message: `راهنمایی: مجموع زوایای ${angleType === 'triangle' ? 'مثلث ۱۸۰ درجه' : 'چهارضلعی ۳۶۰ درجه'} است. مجموع زاویه‌های داده‌شده را از کل کم کنید.`,
+                        });
+                      }
+                    }}
+                    className="px-6 py-3 rounded-xl bg-gradient-to-l from-pink-500 to-rose-500 hover:from-pink-400 hover:to-rose-400 text-white font-bold text-sm shadow-lg active:scale-95 transition-all"
+                  >
+                    تایید زاویه 🎯
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* SUB-TOPIC 4: CENTRAL SYMMETRY (Diverse Shapes: N, Circle, Triangle, Parallelogram, Trapezoid) */}
+            {subTopic === 'central_symmetry' && (
+              <div className="space-y-6">
+                <div className="p-5 rounded-2xl bg-slate-950/80 border border-slate-800 text-center space-y-3">
+                  <div className="text-xs text-slate-400">آزمایش تقارن مرکزی (دوران ۱۸۰ درجه حول نقطه مرکز):</div>
+                  <div className="text-base md:text-lg text-white font-semibold">
+                    آیا شکل زیر یعنی <strong className="text-cyan-300">{getSymmetryInfo().name}</strong> مرکز تقارن دارد؟
+                    دکمه چرخش ۱۸۰ درجه را بزنید تا همپوشانی شکل را بیازمایید:
+                  </div>
+
+                  <div className="flex flex-col items-center gap-4 py-2">
+                    <button
+                      onClick={() => {
+                        SoundFX.click();
+                        setIsRotated180((prev) => !prev);
+                      }}
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md active:scale-95 transition-all"
+                    >
+                      <RotateCw className="w-4 h-4" />
+                      <span>{isRotated180 ? 'بازگردانی به حالت اولیه' : 'دوران ۱۸۰ درجه حول نقطه قرمز'}</span>
+                    </button>
+
+                    <div className="w-64 h-44 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-center relative overflow-hidden">
+                      {/* Central Point */}
+                      <div className="absolute w-3 h-3 rounded-full bg-rose-500 z-20 shadow-md" />
+
+                      {/* Dynamic Shapes */}
+                      <div
+                        className="transition-transform duration-700 flex items-center justify-center"
+                        style={{ transform: `rotate(${isRotated180 ? '180deg' : '0deg'})` }}
+                      >
+                        {symShape === 'parallelogram' && (
+                          <div className="w-36 h-20 bg-gradient-to-tr from-pink-600 to-rose-400 rounded-lg -skew-x-12" />
+                        )}
+                        {symShape === 'circle' && (
+                          <div className="w-24 h-24 rounded-full border-4 border-cyan-400 bg-cyan-600/30" />
+                        )}
+                        {symShape === 'letter_N' && (
+                          <span className="text-7xl font-mono font-black text-amber-400 select-none">N</span>
+                        )}
+                        {symShape === 'equilateral_triangle' && (
+                          <div
+                            className="w-0 h-0 border-l-[45px] border-l-transparent border-r-[45px] border-r-transparent border-b-[80px] border-b-emerald-500"
+                          />
+                        )}
+                        {symShape === 'trapezoid' && (
+                          <div className="w-32 h-16 bg-gradient-to-tr from-pink-500 to-purple-500 [clip-path:polygon(25%_0%,75%_0%,100%_100%,0%_100%)]" />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-center gap-4 p-4 rounded-2xl bg-slate-950/70 border border-slate-800">
+                  <button
+                    onClick={() => {
+                      if (getSymmetryInfo().hasCentral) {
+                        setFeedback({ type: 'success', message: 'کاملاً درست است! شکل با ۱۸۰ درجه دوران دقیقاً روی خودش منطبق می‌شود.' });
+                        advanceStage();
+                      } else {
+                        onLogMistake();
+                        SoundFX.error();
+                        setFeedback({
+                          type: 'error',
+                          message: `راهنمایی: دقت کنید! بعد از دوران ۱۸۰ درجه جهت شکل وارونه شد؛ بنابراین ${getSymmetryInfo().name} مرکز تقارن ندارد.`,
+                        });
+                      }
+                    }}
+                    className="px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-md active:scale-95 transition-all"
+                  >
+                    بله، مرکز تقارن دارد ✓
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      if (!getSymmetryInfo().hasCentral) {
+                        setFeedback({ type: 'success', message: 'احسنت! شکل بعد از ۱۸۰ درجه وارونه شد و تقارن مرکزی ندارد.' });
+                        advanceStage();
+                      } else {
+                        onLogMistake();
+                        SoundFX.error();
+                        setFeedback({
+                          type: 'error',
+                          message: `راهنمایی: به تطابق کامل شکل بعد از چرخش ۱۸۰ درجه نگاه کنید؛ شکل مجدداً همان ساختار اولیه را به خود گرفت.`,
+                        });
+                      }
+                    }}
+                    className="px-6 py-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm shadow-md active:scale-95 transition-all"
+                  >
+                    خیر، ندارد ✗
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* SUB-TOPIC 5: VOLUME & CAPACITY (METERS TO CUBIC CENTIMETERS) */}
+            {subTopic === 'volume_capacity' && (
+              <div className="space-y-6">
+                <div className="p-5 rounded-2xl bg-slate-950/80 border border-slate-800 text-center space-y-3">
+                  <div className="text-xs text-pink-400 font-bold flex items-center justify-center gap-1.5">
+                    <span>📦 محاسبه حجم مکعب‌مستطیل با چالش تبدیل واحد</span>
+                  </div>
+                  <div className="text-sm md:text-base text-slate-200 leading-relaxed max-w-2xl mx-auto">
+                    {volQuestion.story}
+                  </div>
+
+                  {/* Dimension Cards */}
+                  <div className="grid grid-cols-3 gap-3 max-w-lg mx-auto py-2">
+                    <div className="p-3 rounded-xl bg-slate-900 border border-cyan-500/40 text-center">
+                      <div className="text-[11px] text-slate-400">طول (متر)</div>
+                      <div className="text-base font-bold text-cyan-300 mt-1">
+                        {toPersianDigits(volQuestion.lStr)} <span className="text-xs font-normal">متر</span>
+                      </div>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-900 border border-cyan-500/40 text-center">
+                      <div className="text-[11px] text-slate-400">عرض (متر)</div>
+                      <div className="text-base font-bold text-cyan-300 mt-1">
+                        {toPersianDigits(volQuestion.wStr)} <span className="text-xs font-normal">متر</span>
+                      </div>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-900 border border-cyan-500/40 text-center">
+                      <div className="text-[11px] text-slate-400">ارتفاع (متر)</div>
+                      <div className="text-base font-bold text-cyan-300 mt-1">
+                        {toPersianDigits(volQuestion.hStr)} <span className="text-xs font-normal">متر</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Mandatory Conversion Notice */}
+                  <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-500/40 text-xs md:text-sm text-amber-200 font-semibold flex items-center justify-center gap-2">
+                    <span>⚠️ تبدیل واحد الزامی:</span>
+                    <span>ابعاد به «متر» داده شده، اما حجم کل را به «سانتی‌متر مکعب (cm³)» محاسبه کنید!</span>
+                  </div>
+
+                  {/* Unit Guide Accordion Button */}
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => setShowUnitGuide(!showUnitGuide)}
+                      className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs text-pink-300 transition-all"
+                    >
+                      {showUnitGuide ? '▲ بستن راهنمای تبدیل واحد' : '💡 راهنمای گام‌به‌گام تبدیل واحد (کلیک کنید)'}
+                    </button>
+                  </div>
+
+                  {showUnitGuide && (
+                    <div className="p-4 rounded-2xl bg-slate-900/90 border border-pink-500/30 text-xs text-slate-300 text-right space-y-2 max-w-xl mx-auto animate-fadeIn">
+                      <div className="font-bold text-pink-300 border-b border-slate-800 pb-1">
+                        📐 دو روش ساده برای تبدیل واحد به سانتی‌متر مکعب:
+                      </div>
+                      <p>
+                        <strong>روش اول (تبدیل مستقیم ابعاد به سانتی‌متر):</strong> چون هر ۱ متر برابر با ۱۰۰ سانتی‌متر است:
+                      </p>
+                      <ul className="list-disc list-inside text-cyan-300 pr-2 space-y-0.5">
+                        <li>طول: {toPersianDigits(volQuestion.lStr)} متر = {toPersianDigits(volQuestion.lCm)} سانتی‌متر</li>
+                        <li>عرض: {toPersianDigits(volQuestion.wStr)} متر = {toPersianDigits(volQuestion.wCm)} سانتی‌متر</li>
+                        <li>ارتفاع: {toPersianDigits(volQuestion.hStr)} متر = {toPersianDigits(volQuestion.hCm)} سانتی‌متر</li>
+                      </ul>
+                      <p className="text-emerald-300 font-semibold">
+                        سپس سه بعد سانتی‌متری را در هم ضرب کنید: ({toPersianDigits(volQuestion.lCm)} × {toPersianDigits(volQuestion.wCm)} × {toPersianDigits(volQuestion.hCm)})
+                      </p>
+                      <p className="text-slate-400 text-[11px] pt-1">
+                        <strong>روش دوم:</strong> حجم را ابتدا به متر مکعب بیابید و سپس در ۱,۰۰۰,۰۰۰ ضرب کنید (چون ۱ متر مکعب = ۱,۰۰۰,۰۰۰ سانتی‌متر مکعب است).
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center justify-center gap-4 p-5 rounded-2xl bg-slate-950/70 border border-slate-800">
+                  <span className="text-sm text-slate-300 font-semibold">حجم کل بر حسب سانتی‌متر مکعب:</span>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="مثلاً: ۱۰۰۰۰۰۰"
+                      value={ansVol}
+                      onChange={(e) => setAnsVol(e.target.value)}
+                      className="w-44 h-12 text-center text-lg font-bold bg-slate-900 border border-pink-500/60 rounded-xl text-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 placeholder:text-xs placeholder:text-slate-500"
+                    />
+                  </div>
+                  <span className="text-xs text-pink-300 font-bold">cm³ (سانتی‌متر مکعب)</span>
+
+                  <button
+                    onClick={() => {
+                      const cleanAns = toEnglishNumber(ansVol).replace(/[^0-9]/g, '');
+                      const u = parseInt(cleanAns, 10);
+                      if (u === volQuestion.volCm3) {
+                        setFeedback({
+                          type: 'success',
+                          message: `آفرین! تبدیل واحد از متر به سانتی‌متر مکعب کاملاً دقیق انجام شد و حجم مخزن برابر با ${toPersianDigits(volQuestion.volCm3.toLocaleString('fa-IR'))} سانتی‌متر مکعب ثبت گردید.`,
+                        });
+                        advanceStage();
+                      } else {
+                        onLogMistake();
+                        SoundFX.error();
+                        setFeedback({
+                          type: 'error',
+                          message: `راهنمایی: ابعاد بر حسب متر است. ${volQuestion.hint}`,
+                        });
+                      }
+                    }}
+                    className="px-6 py-3 rounded-xl bg-gradient-to-l from-pink-500 to-rose-500 hover:from-pink-400 hover:to-rose-400 text-white font-bold text-sm shadow-lg active:scale-95 transition-all"
+                  >
+                    تایید حجم و تبدیل واحد 🎯
+                  </button>
+                </div>
+              </div>
+            )}
 
             {feedback && (
               <div
@@ -547,7 +843,7 @@ export function GeometryModule({
 
       <CelebrationOverlay
         show={showCelebration}
-        message="سازه سفینه دقیقاً برش خورد!"
+        message="مرحله کارگاه سازه‌ها با موفقیت فتح شد!"
         energyGained={20}
         onDone={() => setShowCelebration(false)}
       />

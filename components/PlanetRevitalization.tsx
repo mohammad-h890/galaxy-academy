@@ -86,7 +86,7 @@ export function PlanetRevitalization({
               <Sparkles className="w-4 h-4 text-emerald-400" />
             </h3>
             <p className="text-xs text-slate-400">
-              با پاسخ‌های صحیح انرژی حیات کسب کنید و آن را برای احیای اکوسیستم سیاره تزریق نمایید.
+              برای احیا و پوشش ۱۰۰ درصدی سیاره به ۱۵۰۰ امتیاز حیات نیاز است (کسب امتیاز در ۵ بخش عملیاتی).
             </p>
           </div>
         </div>
@@ -264,16 +264,21 @@ export function PlanetRevitalization({
 
         {/* Right / Controls & Progress (7 cols) */}
         <div className="lg:col-span-7 space-y-6">
-          {/* Greenery Percentage Bar */}
+          {/* Greenery Percentage Bar with 1500 Points Indicator */}
           <div>
             <div className="flex items-center justify-between text-sm mb-2">
               <span className="text-slate-300 font-medium flex items-center gap-1.5">
                 <TreePine className="w-4 h-4 text-emerald-400" />
                 <span>شاخص سرسبزی و حیات بیولوژیک:</span>
               </span>
-              <strong className="text-emerald-400 font-mono text-base font-bold tabular-nums">
-                ٪{toPersianDigits(planetGreenery)}
-              </strong>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-amber-300 font-mono">
+                  ({toPersianDigits(totalEnergyEarned)} از ۱۵۰۰ امتیاز)
+                </span>
+                <strong className="text-emerald-400 font-mono text-base font-bold tabular-nums">
+                  ٪{toPersianDigits(planetGreenery)}
+                </strong>
+              </div>
             </div>
 
             <div className="w-full h-5 rounded-full bg-slate-950 border border-slate-800 overflow-hidden p-0.5 shadow-inner">
@@ -283,9 +288,9 @@ export function PlanetRevitalization({
               />
             </div>
             <div className="flex justify-between text-[11px] text-slate-500 mt-1">
-              <span>۰٪ کویر بی‌آب</span>
-              <span>۵۰٪ جوانه‌زنی مراتع</span>
-              <span>۱۰۰٪ پوشش سبز کامل</span>
+              <span>۰ امتیاز (کویر)</span>
+              <span>۷۵۰ امتیاز (۵۰٪ حیات)</span>
+              <span>۱۵۰۰ امتیاز (۱۰۰٪ پوشش کامل)</span>
             </div>
           </div>
 

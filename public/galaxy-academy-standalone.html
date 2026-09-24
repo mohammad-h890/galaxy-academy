@@ -1,0 +1,1266 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>سفینه امید · آکادمی کهکشان (نسخه مجتمع و مستقل ششم)</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- React & ReactDOM CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <!-- Babel -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;600;700;800;900&display=swap');
+    
+    :root {
+      direction: rtl;
+    }
+
+    * {
+      font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, sans-serif;
+      user-select: none;
+      box-sizing: border-box;
+    }
+    
+    input, textarea {
+      user-select: text;
+      direction: rtl;
+      text-align: center;
+    }
+
+    /* RTL specific math notation: Whole number on Left, Fraction on Right */
+    .fraction-container {
+      display: inline-flex;
+      align-items: center;
+      direction: ltr;
+      gap: 0.5rem;
+    }
+
+    .fraction-vertical {
+      display: inline-flex;
+      flex-direction: column;
+      vertical-align: middle;
+      text-align: center;
+      line-height: 1.1;
+      padding: 0 4px;
+    }
+
+    .fraction-num {
+      border-bottom: 2px solid currentColor;
+      padding-bottom: 2px;
+      font-weight: 700;
+    }
+
+    .fraction-den {
+      padding-top: 2px;
+      font-weight: 700;
+    }
+
+    /* Decimal Vertical Alignment Box (RTL Strict) */
+    .decimal-column-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(28px, 1fr));
+      gap: 4px;
+      direction: ltr; /* numbers themselves align mathematically ltr, inside rtl card */
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+  </style>
+</head>
+<body class="bg-[#07090f] text-slate-100 min-h-screen overflow-x-hidden selection:bg-cyan-500 selection:text-black text-right" dir="rtl">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // --- Web Audio Synthesizer ---
+    class SoundFX {
+      static ctx = null;
+      static getContext() {
+        if (!this.ctx && typeof window !== 'undefined') {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (AudioContext) this.ctx = new AudioContext();
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+        return this.ctx;
+      }
+      static click() {
+        const ctx = this.getContext();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.setValueAtTime(600, now);
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.06);
+      }
+      static laser() {
+        const ctx = this.getContext();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(800, now);
+        osc.frequency.exponentialRampToValueAtTime(100, now + 0.2);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.21);
+      }
+      static success() {
+        const ctx = this.getContext();
+        if (!ctx) return;
+        const notes = [523.25, 659.25, 783.99, 1046.5];
+        notes.forEach((freq, idx) => {
+          const now = ctx.currentTime + idx * 0.08;
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, now);
+          gain.gain.setValueAtTime(0.2, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.26);
+        });
+      }
+      static error() {
+        const ctx = this.getContext();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(150, now);
+        osc.frequency.setValueAtTime(110, now + 0.1);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.26);
+      }
+    }
+
+    // Convert digits to Persian
+    function toPersian(num) {
+      if (num === undefined || num === null) return '';
+      const farsi = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
+      return num.toString().replace(/\d/g, (x) => farsi[parseInt(x, 10)]).replace(/\./g, '٫');
+    }
+
+    // Convert Persian digits to English for math calculations
+    function toEnglish(str) {
+      if (!str) return '';
+      return str.toString()
+        .replace(/[۰-۹]/g, d => "۰۱۲۳۴۵۶۷۸۹".indexOf(d))
+        .replace(/٫/g, '.')
+        .replace(/,/g, '.')
+        .trim();
+    }
+
+    // --- Visual Fraction Display Component (Strict Persian RTL) ---
+    // In Persian: Whole number is on the right, Fraction is on the left
+    function PersianVisualFraction({ whole, num, den, color = "text-cyan-300" }) {
+      return (
+        <span className={`fraction-container ${color}`}>
+          {whole !== undefined && whole !== 0 && (
+            <span className="text-2xl md:text-3xl font-extrabold">{toPersian(whole)}</span>
+          )}
+          <span className="fraction-vertical text-lg md:text-xl">
+            <span className="fraction-num">{toPersian(num)}</span>
+            <span className="fraction-den">{toPersian(den)}</span>
+          </span>
+        </span>
+      );
+    }
+
+    // --- Robot Guide Avatar Component (Strict RTL) ---
+    function RobotGuide({ message, tip, mood = 'happy' }) {
+      const moodColors = {
+        happy: 'from-cyan-500 to-blue-600 border-cyan-400',
+        warning: 'from-amber-500 to-orange-600 border-amber-400',
+        excited: 'from-emerald-500 to-teal-600 border-emerald-400'
+      };
+      return (
+        <div className="flex items-start gap-4 p-4 md:p-5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-xl text-right">
+          <div className={`w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-gradient-to-tr ${moodColors[mood]} p-0.5 flex-shrink-0 flex items-center justify-center text-white shadow-lg`}>
+            <div className="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center text-2xl">
+              {mood === 'warning' ? '⚠️' : mood === 'excited' ? '🌟' : '🤖'}
+            </div>
+          </div>
+          <div className="space-y-1.5 flex-1">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-cyan-400 tracking-wider">دستیار هوشمند سفینه امید</span>
+            </div>
+            <p className="text-xs md:text-sm text-slate-200 leading-relaxed font-normal">{message}</p>
+            {tip && (
+              <div className="pt-1 text-xs text-amber-300 font-medium">
+                💡 نکته طلایی: {tip}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    const STORAGE_KEY = 'galaxy_academy_full_standalone';
+    function loadState() {
+      try {
+        const d = localStorage.getItem(STORAGE_KEY);
+        if (d) return JSON.parse(d);
+      } catch(e) {}
+      return {
+        playerName: '',
+        lifeEnergy: 100,
+        totalEnergyEarned: 100,
+        planetGreenery: 20,
+        completedModules: [],
+        moduleScores: { fractions: 0, decimals: 0, ratios: 0, geometry: 0, statistics: 0 }
+      };
+    }
+    function saveState(s) {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch(e) {}
+    }
+
+    // ==========================================
+    // MAIN APP COMPONENT
+    // ==========================================
+    function App() {
+      const [appState, setAppState] = useState(loadState);
+      const [view, setView] = useState(() => appState.playerName ? 'dashboard' : 'registration');
+      const [tempName, setTempName] = useState('');
+      const [activeModule, setActiveModule] = useState(null);
+
+      // Sub-module states
+      const [stage, setStage] = useState(0);
+      const [feedback, setFeedback] = useState(null);
+
+      // Fractions interactive state
+      const [fracState, setFracState] = useState({
+        w1: 4, n1: 1, d1: 5,
+        w2: 1, n2: 3, d2: 5,
+        wholesBroken: false,
+        ansWhole: '',
+        ansNum: ''
+      });
+
+      // Decimals state (Defaults to larger on top: 30.8 - 7.22)
+      const [decState, setDecState] = useState({
+        num1: '30.8',
+        num2: '7.22',
+        op: '-',
+        aligned: false,
+        zeroPadAdded: false,
+        userAnswer: ''
+      });
+
+      // Ratios state with Word Problem
+      const [ratioState, setRatioState] = useState({
+        baseA: 3, baseB: 5, mult: 4, userAns: '',
+        story: 'یک کاوشگر فضایی برای پیمودن هر ۵ کیلومتر، ۳ لیتر سوخت پلاسما مصرف می‌کند. اگر در یک پیمایش ۱۲ لیتر سوخت مصرف شده باشد، چند کیلومتر را پیموده است؟'
+      });
+
+      // Geometry state
+      const [geoState, setGeoState] = useState({
+        type: 'rhombus',
+        d1: 10, d2: 6,
+        b1: 4, b2: 8, h: 5,
+        simulated: false,
+        userArea: ''
+      });
+
+      // Statistics state
+      const [statState, setStatState] = useState({
+        h1: 1, m1: 45,
+        h2: 2, m2: 30,
+        ansH: '', ansM: ''
+      });
+
+      useEffect(() => {
+        saveState(appState);
+      }, [appState]);
+
+      // Registration
+      const handleRegister = (e) => {
+        e.preventDefault();
+        const clean = tempName.trim();
+        if (!clean) return;
+        SoundFX.success();
+        setAppState(prev => ({ ...prev, playerName: clean }));
+        setView('dashboard');
+      };
+
+      const handleAddEnergy = (amount = 20) => {
+        setAppState(prev => ({
+          ...prev,
+          lifeEnergy: prev.lifeEnergy + amount,
+          totalEnergyEarned: prev.totalEnergyEarned + amount,
+          moduleScores: {
+            ...prev.moduleScores,
+            [activeModule]: Math.max(prev.moduleScores[activeModule] || 0, stage + 1)
+          }
+        }));
+      };
+
+      const handleInjectEnergy = (cost) => {
+        if (appState.lifeEnergy < cost) return;
+        SoundFX.laser();
+        const boost = cost >= 100 ? 35 : cost >= 50 ? 15 : 5;
+        setAppState(prev => ({
+          ...prev,
+          lifeEnergy: prev.lifeEnergy - cost,
+          planetGreenery: Math.min(100, prev.planetGreenery + boost)
+        }));
+      };
+
+      // Open a module
+      const openModule = (modKey) => {
+        SoundFX.click();
+        setActiveModule(modKey);
+        const savedScore = appState.moduleScores[modKey] || 0;
+        setStage(Math.min(14, savedScore));
+        setupStage(modKey, Math.min(14, savedScore));
+      };
+
+      const setupStage = (modKey, stg) => {
+        setFeedback(null);
+        const s = stg + 1;
+        if (modKey === 'fractions') {
+          const w1 = 3 + Math.floor(s / 3);
+          const w2 = 1 + Math.floor(s / 6);
+          const den = 4 + (s % 3);
+          const n1 = 1;
+          const n2 = den - 1;
+          setFracState({
+            w1, n1, d1: den,
+            w2, n2, d2: den,
+            wholesBroken: false,
+            ansWhole: '',
+            ansNum: ''
+          });
+        } else if (modKey === 'decimals') {
+          const isSub = s % 2 === 1;
+          const w1 = 15 + Math.floor(Math.random() * 20); // 15 to 34
+          const w2 = 2 + Math.floor(Math.random() * 8); // 2 to 9
+          const d1 = s % 2 === 0 ? Math.floor(Math.random() * 8) + 1 : Math.floor(Math.random() * 80) + 12;
+          const d2 = s % 2 === 0 ? Math.floor(Math.random() * 80) + 12 : Math.floor(Math.random() * 8) + 1;
+          const cand1 = `${w1}.${d1}`;
+          const cand2 = `${w2}.${d2}`;
+          const v1 = parseFloat(cand1);
+          const v2 = parseFloat(cand2);
+          const sTop = v1 >= v2 ? cand1 : cand2;
+          const sBot = v1 >= v2 ? cand2 : cand1;
+          setDecState({
+            num1: sTop,
+            num2: sBot,
+            op: isSub ? '-' : '+',
+            aligned: false,
+            zeroPadAdded: false,
+            userAnswer: ''
+          });
+        } else if (modKey === 'ratios') {
+          const baseA = 2 + (s % 3);
+          const baseB = 5 + (s % 4);
+          const mult = 2 + (s % 5);
+          const stories = [
+            `یک کاوشگر فضایی برای پیمودن هر ${toPersian(baseB)} کیلومتر، ${toPersian(baseA)} لیتر سوخت مصرف می‌کند. اگر در یک پیمایش ${toPersian(baseA * mult)} لیتر سوخت مصرف شده باشد، چند کیلومتر را پیموده است؟`,
+            `یک چاپگر سه‌بعدی در پایگاه در هر ${toPersian(baseA)} دقیقه، ${toPersian(baseB)} مهره تیتانیومی تولید می‌کند. در ${toPersian(baseA * mult)} دقیقه چند مهره تولید خواهد کرد؟`,
+            `در ساخت آلیاژ سپر به ازای هر ${toPersian(baseA)} کیلوگرم مس، ${toPersian(baseB)} کیلوگرم تیتانیوم ترکیب می‌شود. اگر ${toPersian(baseA * mult)} کیلوگرم مس مصرف شود، چند کیلوگرم تیتانیوم نیاز است؟`
+          ];
+          setRatioState({
+            baseA, baseB, mult, userAns: '',
+            story: stories[s % stories.length]
+          });
+        } else if (modKey === 'geometry') {
+          const isRhombus = s % 2 !== 0;
+          setGeoState({
+            type: isRhombus ? 'rhombus' : 'trapezoid',
+            d1: 6 + s * 2,
+            d2: 4 + (s % 4) * 2,
+            b1: 4 + (s % 3) * 2,
+            b2: 8 + (s % 4) * 2,
+            h: 4 + (s % 3),
+            simulated: false,
+            userArea: ''
+          });
+        } else if (modKey === 'statistics') {
+          const h1 = 6 + (s % 5);
+          const h2 = 2 + (s % 3);
+          const m1 = 12 + (s % 4) * 4;
+          const m2 = 35 + (s % 5) * 5;
+          setStatState({
+            h1,
+            m1,
+            h2,
+            m2,
+            ansH: '',
+            ansM: ''
+          });
+        }
+      };
+
+      const nextStageOrFinish = () => {
+        if (stage < 14) {
+          const next = stage + 1;
+          setStage(next);
+          setupStage(activeModule, next);
+        } else {
+          // Module Completed
+          SoundFX.success();
+          setAppState(prev => {
+            const comps = prev.completedModules.includes(activeModule)
+              ? prev.completedModules
+              : [...prev.completedModules, activeModule];
+            return { ...prev, completedModules: comps };
+          });
+          alert(`🎉 تبریک قهرمان! تمام ۱۵ مرحله ماژول با پیروزی فتح شد!`);
+          setActiveModule(null);
+        }
+      };
+
+      const modules = [
+        { key: 'fractions', title: '۱. موتورخانه (کسرها)', desc: 'تفریق اعداد مخلوط و خرد کردن واحدهای کامل', icon: '🔥', color: 'from-blue-600 to-cyan-500' },
+        { key: 'decimals', title: '۲. سیستم ناوبری (اعشار)', desc: 'تراز لیزری ممیزها و سپرهای صفر کمکی', icon: '🎯', color: 'from-cyan-600 to-teal-500' },
+        { key: 'ratios', title: '۳. آزمایشگاه سوخت (تناسب)', desc: 'جداول تناسب و اعمال روابط ضربی چرخ‌دنده‌ها', icon: '⚙️', color: 'from-purple-600 to-indigo-500' },
+        { key: 'geometry', title: '۴. کارگاه سازه‌ها (هندسه)', desc: 'برش لیزری و مساحت لوزی و ذوزنقه با شبیه‌سازی بصری', icon: '📐', color: 'from-pink-600 to-rose-500' },
+        { key: 'statistics', title: '۵. اتاق فرمان (آمار و زمان)', desc: 'محاسبات ساعت در مبنای ۶۰ و تحلیل میانگین', icon: '⏱️', color: 'from-amber-600 to-orange-500' }
+      ];
+
+      return (
+        <div className="relative min-h-screen p-4 md:p-6 flex flex-col items-center">
+          {/* Nebula Glow Background */}
+          <div className="fixed inset-0 pointer-events-none opacity-40 z-0">
+            <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-cyan-600/15 rounded-full blur-3xl animate-pulse"></div>
+            <div className="absolute bottom-1/3 left-1/4 w-[500px] h-[500px] bg-purple-600/15 rounded-full blur-3xl"></div>
+          </div>
+
+          <div className="relative z-10 w-full max-w-5xl space-y-6">
+            {/* Top Navigation Header (RTL) */}
+            <header className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-xl flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 via-blue-600 to-indigo-600 flex items-center justify-center text-xl shadow-lg shadow-cyan-500/30">
+                  🚀
+                </div>
+                <div>
+                  <h1 className="text-base md:text-lg font-bold bg-gradient-to-l from-cyan-300 via-sky-200 to-white bg-clip-text text-transparent">
+                    سفینه امید · آکادمی کهکشان (پایه ششم)
+                  </h1>
+                  <p className="text-xs text-slate-400">سامانه یادگیری تعاملی چالش‌های ریاضی</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-950 border border-emerald-500/40 text-emerald-400 font-bold text-sm">
+                  <span>⚡ انرژی حیات:</span>
+                  <span>{toPersian(appState.lifeEnergy)}</span>
+                </div>
+
+                {view === 'dashboard' && activeModule && (
+                  <button
+                    onClick={() => { SoundFX.click(); setActiveModule(null); }}
+                    className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 font-semibold border border-slate-700 active:scale-95 transition-all"
+                  >
+                    عرشه فرماندهی ⌂
+                  </button>
+                )}
+              </div>
+            </header>
+
+            {/* VIEW 1: REGISTRATION */}
+            {view === 'registration' && (
+              <div className="max-w-md mx-auto my-12 p-8 rounded-3xl bg-slate-900/90 border border-cyan-500/30 shadow-2xl text-center space-y-6">
+                <div className="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-tr from-cyan-600 to-blue-600 flex items-center justify-center text-4xl shadow-xl shadow-cyan-500/20">
+                  🛸
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-white">ثبت هویت مهندس سفینه</h2>
+                  <p className="text-xs text-slate-400 mt-2">
+                    برای احیای سیاره و هدایت بخش‌های ۵گانه سفینه امید، نام خود را وارد کنید:
+                  </p>
+                </div>
+                <form onSubmit={handleRegister} className="space-y-4">
+                  <input
+                    type="text"
+                    required
+                    placeholder="نام و نام خانوادگی دانش‌آموز..."
+                    value={tempName}
+                    onChange={(e) => setTempName(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-cyan-500/50 text-center text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-400"
+                  />
+                  <button
+                    type="submit"
+                    className="w-full py-3.5 rounded-xl bg-gradient-to-l from-cyan-500 to-blue-600 hover:brightness-110 text-black font-bold shadow-lg shadow-cyan-500/20 active:scale-95 transition-all"
+                  >
+                    ورود به عرشه فرماندهی 🚀
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {/* VIEW 2: DASHBOARD (MAIN HUB) */}
+            {view === 'dashboard' && !activeModule && (
+              <div className="space-y-6 animate-fadeIn">
+                <RobotGuide
+                  message={`خوش آمدید مهندس ${appState.playerName || 'گرامی'}! با ورود به بخش‌های ۵گانه و حل ۱۵ مرحله چالش تعاملی، انرژی حیات کسب کنید و با تزریق آن، مراتع و طبیعت سیاره را احیا نمایید.`}
+                  tip="هر پاسخ صحیح +۲۰ واحد انرژی حیات به مخازن شما اضافه می‌کند!"
+                  mood={appState.planetGreenery >= 75 ? 'excited' : 'happy'}
+                />
+
+                {/* Terraforming Card */}
+                <div className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 shadow-xl space-y-4 text-right">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <h3 className="text-lg font-bold text-emerald-300 flex items-center gap-2">
+                        <span>🌱 سامانه شبیه‌ساز احیای زیست‌بوم سیاره</span>
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-0.5">انرژی حیات به دست آمده از حل چالش‌ها را به خاک سیاره تزریق کنید.</p>
+                    </div>
+                    <div className="px-4 py-1.5 rounded-2xl bg-slate-950 border border-emerald-500/40 text-emerald-400 font-bold text-sm flex items-center gap-2">
+                      <span className="text-xs text-amber-300">({toPersian(appState.totalEnergyEarned)} از ۱۵۰۰ امتیاز)</span>
+                      <span>سرسبزی: ٪{toPersian(appState.planetGreenery)}</span>
+                    </div>
+                  </div>
+
+                  {/* Progress Bar */}
+                  <div className="w-full h-5 rounded-full bg-slate-950 border border-slate-800 overflow-hidden p-0.5">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-l from-emerald-600 via-teal-500 to-cyan-400 transition-all duration-700 shadow-md shadow-emerald-500/30"
+                      style={{ width: `${appState.planetGreenery}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-[11px] text-slate-500">
+                    <span>۰ امتیاز (کویر)</span>
+                    <span>۷۵۰ امتیاز (۵۰٪ حیات)</span>
+                    <span>۱۵۰۰ امتیاز (۱۰۰٪ پوشش کامل)</span>
+                  </div>
+
+                  {/* Inject Buttons */}
+                  <div className="flex flex-wrap gap-3 pt-1">
+                    <button
+                      onClick={() => handleInjectEnergy(20)}
+                      disabled={appState.lifeEnergy < 20}
+                      className="px-4 py-2.5 rounded-xl bg-emerald-950/80 border border-emerald-500/50 hover:bg-emerald-900/70 disabled:opacity-30 disabled:cursor-not-allowed text-xs text-emerald-200 font-bold flex items-center gap-2 active:scale-95 transition-all"
+                    >
+                      <span>⚡ تزریق ۲۰ انرژی</span>
+                      <span className="text-[10px] text-emerald-400">(+۵٪ سرسبزی)</span>
+                    </button>
+                    <button
+                      onClick={() => handleInjectEnergy(50)}
+                      disabled={appState.lifeEnergy < 50}
+                      className="px-4 py-2.5 rounded-xl bg-teal-950/80 border border-teal-500/50 hover:bg-teal-900/70 disabled:opacity-30 disabled:cursor-not-allowed text-xs text-teal-200 font-bold flex items-center gap-2 active:scale-95 transition-all"
+                    >
+                      <span>⚡ تزریق ۵۰ انرژی</span>
+                      <span className="text-[10px] text-teal-400">(+۱۵٪ سرسبزی)</span>
+                    </button>
+                    <button
+                      onClick={() => handleInjectEnergy(100)}
+                      disabled={appState.lifeEnergy < 100}
+                      className="px-4 py-2.5 rounded-xl bg-cyan-950/80 border border-cyan-500/50 hover:bg-cyan-900/70 disabled:opacity-30 disabled:cursor-not-allowed text-xs text-cyan-200 font-bold flex items-center gap-2 active:scale-95 transition-all"
+                    >
+                      <span>🌟 تزریق ۱۰۰ انرژی</span>
+                      <span className="text-[10px] text-cyan-300">(+۳۵٪ جهش احیا)</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 5 Modules Grid (RTL Aligned) */}
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-bold text-cyan-300">بخش‌های عملیاتی سفینه امید (۱۵ مرحله‌ای)</h3>
+                    <span className="text-xs text-slate-400">
+                      {toPersian(appState.completedModules.length)} از ۵ بخش تکمیل شده
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {modules.map((m) => {
+                      const completed = appState.completedModules.includes(m.key);
+                      const score = appState.moduleScores[m.key] || 0;
+                      return (
+                        <div
+                          key={m.key}
+                          onClick={() => openModule(m.key)}
+                          className={`p-6 rounded-2xl bg-slate-900/90 border cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-xl active:scale-95 flex flex-col justify-between min-h-[190px] text-right ${
+                            completed ? 'border-emerald-500/50 shadow-emerald-950/20' : 'border-slate-800 hover:border-cyan-500/50'
+                          }`}
+                        >
+                          <div>
+                            <div className="flex items-center justify-between mb-3">
+                              <div className={`w-10 h-10 rounded-xl bg-gradient-to-tr ${m.color} flex items-center justify-center text-lg shadow-md`}>
+                                {m.icon}
+                              </div>
+                              {completed ? (
+                                <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-950 border border-emerald-500 text-emerald-400 font-bold">
+                                  ✓ ۱۵ مرحله کامل
+                                </span>
+                              ) : (
+                                <span className="text-xs text-slate-400">مرحله {toPersian(score)} از ۱۵</span>
+                              )}
+                            </div>
+                            <h4 className="text-base font-bold text-white mb-1.5">{m.title}</h4>
+                            <p className="text-xs text-slate-400 leading-relaxed">{m.desc}</p>
+                          </div>
+
+                          <div className="mt-4 pt-3 border-t border-slate-800 flex justify-between items-center text-xs">
+                            <span className="text-emerald-400">+۲۰ انرژی/مرحله</span>
+                            <span className="text-cyan-300 font-bold">ورود به ماژول ←</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ======================================================== */}
+            {/* MODULE 1: FRACTIONS (کسرها - کاملاً راست‌چین با نمادهای کتاب فارسی) */}
+            {/* ======================================================== */}
+            {activeModule === 'fractions' && (
+              <div className="p-6 md:p-8 rounded-3xl bg-slate-900/95 border border-blue-500/30 shadow-2xl space-y-6 text-right">
+                <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+                  <div>
+                    <h3 className="text-lg md:text-xl font-bold text-white">موتورخانه: تفریق اعداد مخلوط و شکستن واحد</h3>
+                    <p className="text-xs text-cyan-400 mt-1">مرحله {toPersian(stage + 1)} از ۱۵</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-emerald-400 font-bold px-3 py-1 rounded-xl bg-emerald-950/80 border border-emerald-500/40">+۲۰ انرژی</span>
+                    <button onClick={() => setActiveModule(null)} className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs text-slate-300">خروج</button>
+                  </div>
+                </div>
+
+                {/* Mathematical Equation Display Box (dir="ltr": Larger on Left, Minus, Smaller on Right) */}
+                <div className="p-6 rounded-3xl bg-slate-950 border border-slate-800 flex flex-col items-center justify-center gap-4 text-center">
+                  <div className="text-xs text-slate-400">عبارت تفریق کسرها (کسر بزرگتر در چپ و کسر کوچکتر در راست):</div>
+                  <div className="flex items-center justify-center gap-4 md:gap-6 text-2xl md:text-3xl text-white" dir="ltr">
+                    {/* Left: Larger Mixed Fraction */}
+                    <div className="p-3 px-5 rounded-2xl bg-slate-900/80 border border-cyan-500/40">
+                      <PersianVisualFraction whole={fracState.w1} num={fracState.n1} den={fracState.d1} color="text-cyan-300" />
+                    </div>
+
+                    <span className="text-rose-400 font-extrabold text-3xl">−</span>
+
+                    {/* Right: Smaller Mixed Fraction */}
+                    <div className="p-3 px-5 rounded-2xl bg-slate-900/80 border border-rose-500/40">
+                      <PersianVisualFraction whole={fracState.w2} num={fracState.n2} den={fracState.d2} color="text-rose-300" />
+                    </div>
+                  </div>
+
+                  {/* Unit Breaking Hint */}
+                  <div className="text-xs text-slate-300 mt-2 max-w-lg leading-relaxed text-center">
+                    💡 توجه: چون صورت کسر اول ({toPersian(fracState.n1)}) از کسر دوم ({toPersian(fracState.n2)}) کمتر است، یک واحد کامل از {toPersian(fracState.w1)} خرد کنید تا کسر اول به <PersianVisualFraction whole={fracState.w1 - 1} num={fracState.n1 + fracState.d1} den={fracState.d1} color="text-emerald-300" /> تبدیل شود!
+                  </div>
+                </div>
+
+                {/* Reactor interactive unit breaking */}
+                <div className="p-5 rounded-2xl bg-slate-950/80 border border-cyan-500/30 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold text-cyan-300">کپسول‌های سوخت کسر:</span>
+                    <button
+                      onClick={() => {
+                        SoundFX.laser();
+                        setFracState(prev => ({ ...prev, wholesBroken: true }));
+                      }}
+                      disabled={fracState.wholesBroken}
+                      className="px-4 py-2 rounded-xl bg-gradient-to-l from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 disabled:opacity-40 disabled:cursor-not-allowed text-xs text-black font-bold shadow-md active:scale-95 transition-all"
+                    >
+                      🔨 خرد کردن ۱ کپسول به {toPersian(fracState.d1)} قطعه
+                    </button>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-3 py-2">
+                    {/* Visual Wholes */}
+                    {Array.from({ length: fracState.wholesBroken ? fracState.w1 - 1 : fracState.w1 }).map((_, i) => (
+                      <div key={i} className="w-12 h-14 rounded-xl bg-cyan-600/30 border border-cyan-400 flex items-center justify-center font-bold text-cyan-300 text-sm">
+                        ۱ کامل
+                      </div>
+                    ))}
+
+                    {/* Broken Fraction Parts */}
+                    {fracState.wholesBroken && (
+                      <div className="flex items-center gap-1.5 p-2 rounded-xl bg-blue-950/60 border border-blue-500/40">
+                        {Array.from({ length: fracState.n1 + fracState.d1 }).map((_, i) => (
+                          <div key={i} className="w-8 h-13 rounded-lg bg-emerald-500/40 border border-emerald-400 flex flex-col items-center justify-center text-[10px] text-emerald-200 font-bold leading-none p-1">
+                            <span className="border-b border-emerald-300 pb-0.5">{toPersian(1)}</span>
+                            <span className="pt-0.5">{toPersian(fracState.d1)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Answer Form (dir="ltr": Whole Number on Left, Fraction on Right) */}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const correctWhole = (fracState.w1 - 1) - fracState.w2;
+                    const correctNum = (fracState.n1 + fracState.d1) - fracState.n2;
+
+                    const uW = parseInt(toEnglish(fracState.ansWhole), 10);
+                    const uN = parseInt(toEnglish(fracState.ansNum), 10);
+
+                    if (uW === correctWhole && uN === correctNum) {
+                      SoundFX.success();
+                      setFeedback({ type: 'success', text: `کاملاً صحیح است! یک واحد با موفقیت خرد شد و تفریق انجام گرفت.` });
+                      handleAddEnergy(20);
+                      setTimeout(nextStageOrFinish, 1300);
+                    } else {
+                      SoundFX.error();
+                      setFeedback({ type: 'error', text: `راهنمایی: دقت کنید! با خرد کردن ۱ واحد، عدد صحیح از ${toPersian(fracState.w1)} به ${toPersian(fracState.w1 - 1)} کاهش یافته و به صورت کسر مقدار ${toPersian(fracState.d1)} اضافه می‌شود. دوباره محاسبه کنید!` });
+                    }
+                  }}
+                  className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-4"
+                >
+                  <label className="block text-sm font-semibold text-slate-300">
+                    پاسخ نهایی تفریق (عدد صحیح در چپ و کسر در راست):
+                  </label>
+
+                  <div className="flex flex-wrap items-center justify-center gap-6" dir="ltr">
+                    {/* 1. Whole Number Input (Placed on Left in dir="ltr") */}
+                    <div className="flex flex-col items-center gap-1.5">
+                      <span className="text-xs text-slate-400 font-semibold">واحد کامل (صحیح)</span>
+                      <input
+                        type="text"
+                        required
+                        placeholder="صحیح"
+                        value={fracState.ansWhole}
+                        onChange={(e) => setFracState(prev => ({ ...prev, ansWhole: e.target.value }))}
+                        className="w-24 px-3 py-2.5 rounded-xl bg-slate-900 border border-cyan-500/50 text-center text-white text-lg font-bold focus:outline-none focus:ring-2 focus:ring-cyan-400"
+                      />
+                    </div>
+
+                    {/* 2. Fraction Box (Placed on Right of whole number in dir="ltr") */}
+                    <div className="flex flex-col items-center gap-1">
+                      <span className="text-xs text-slate-400 font-semibold">کسر حاصل</span>
+                      <div className="fraction-vertical">
+                        <input
+                          type="text"
+                          required
+                          placeholder="صورت"
+                          value={fracState.ansNum}
+                          onChange={(e) => setFracState(prev => ({ ...prev, ansNum: e.target.value }))}
+                          className="w-20 px-2 py-1.5 rounded-lg bg-slate-900 border border-cyan-500/50 text-center text-white font-bold fraction-num focus:outline-none focus:ring-2 focus:ring-cyan-400"
+                        />
+                        <div className="text-center font-bold text-cyan-400 py-1 fraction-den text-lg">
+                          {toPersian(fracState.d1)}
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="px-8 py-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-bold text-base shadow-lg shadow-cyan-500/20 active:scale-95 transition-all self-end"
+                    >
+                      تایید پاسخ 🎯
+                    </button>
+                  </div>
+                </form>
+
+                {feedback && (
+                  <div className={`p-4 rounded-xl text-sm font-semibold ${feedback.type === 'success' ? 'bg-emerald-950/80 border border-emerald-500 text-emerald-300' : 'bg-rose-950/80 border border-rose-500 text-rose-300'}`}>
+                    {feedback.text}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ======================================================== */}
+            {/* MODULE 2: DECIMALS (اعشار - تراز ستونی دقیق ممیزها)      */}
+            {/* ======================================================== */}
+            {activeModule === 'decimals' && (
+              <div className="p-6 md:p-8 rounded-3xl bg-slate-900/95 border border-teal-500/30 shadow-2xl space-y-6 text-right">
+                <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+                  <div>
+                    <h3 className="text-lg md:text-xl font-bold text-white">سیستم ناوبری: تراز لیزری ممیزها و سپر صفر کمکی</h3>
+                    <p className="text-xs text-teal-400 mt-1">مرحله {toPersian(stage + 1)} از ۱۵</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-emerald-400 font-bold px-3 py-1 rounded-xl bg-emerald-950/80 border border-emerald-500/40">+۲۰ انرژی</span>
+                    <button onClick={() => setActiveModule(null)} className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs text-slate-300">خروج</button>
+                  </div>
+                </div>
+
+                {/* Laser Alignment Canvas */}
+                <div className="p-6 rounded-3xl bg-slate-950 border border-slate-800 flex flex-col items-center space-y-5">
+                  <div className="flex flex-wrap items-center justify-center gap-3">
+                    <button
+                      onClick={() => {
+                        SoundFX.click();
+                        setDecState(prev => ({ ...prev, aligned: true }));
+                      }}
+                      className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-black font-bold text-xs shadow-md active:scale-95 transition-all"
+                    >
+                      🎯 ۱. تراز لیزری ممیزها
+                    </button>
+                    <button
+                      onClick={() => {
+                        SoundFX.laser();
+                        setDecState(prev => ({ ...prev, zeroPadAdded: true }));
+                      }}
+                      className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-black font-bold text-xs shadow-md active:scale-95 transition-all"
+                    >
+                      🛡️ ۲. فعال‌سازی سپر صفر (+۰)
+                    </button>
+                  </div>
+
+                  {/* Vertical Column Math Alignment Box */}
+                  <div className="relative p-6 px-12 rounded-2xl bg-slate-900 border border-teal-500/40 text-2xl md:text-3xl font-mono text-center space-y-3" dir="ltr">
+                    {/* Laser line vertically through decimal slash */}
+                    {decState.aligned && (
+                      <div className="absolute top-4 bottom-4 left-1/2 -translate-x-1/2 w-0.5 bg-emerald-400 shadow-[0_0_12px_#34d399] z-10"></div>
+                    )}
+
+                    {/* Row 1 (Top: Larger Number) */}
+                    <div className="flex items-center justify-center gap-1 text-cyan-300 font-bold">
+                      <span className="w-20 text-right">{toPersian(decState.num1.split('.')[0])}</span>
+                      <span className="text-emerald-400 font-extrabold px-1">/</span>
+                      <span className="w-20 text-left flex items-center">
+                        {toPersian(decState.num1.split('.')[1])}
+                        {decState.zeroPadAdded && decState.num1.split('.')[1].length === 1 && decState.num2.split('.')[1].length === 2 && (
+                          <span className="text-amber-400 font-extrabold">{toPersian('0')}</span>
+                        )}
+                      </span>
+                    </div>
+
+                    {/* Row 2 (Bottom: Smaller Number) */}
+                    <div className="flex items-center justify-center gap-1 text-teal-300 font-bold border-b-2 border-slate-700 pb-2">
+                      <span className="w-20 text-right flex items-center justify-end gap-2">
+                        <span className="text-rose-400 text-2xl font-bold">{decState.op}</span>
+                        <span>{toPersian(decState.num2.split('.')[0])}</span>
+                      </span>
+                      <span className="text-emerald-400 font-extrabold px-1">/</span>
+                      <span className="w-20 text-left flex items-center">
+                        {toPersian(decState.num2.split('.')[1])}
+                        {decState.zeroPadAdded && decState.num2.split('.')[1].length === 1 && decState.num1.split('.')[1].length === 2 && (
+                          <span className="text-amber-400 font-extrabold">{toPersian('0')}</span>
+                        )}
+                      </span>
+                    </div>
+
+                    <div className="text-xs text-slate-400 pt-1" dir="rtl">
+                      {decState.zeroPadAdded ? '✅ ارقام اعشاری هم‌مرتبه شدند و ممیزها در یک خط تراز قرار دارند' : '💡 می‌توانید مستقیم پاسخ دهید یا دکمه تراز لیزری را بزنید'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Answer Form */}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const expected = decState.op === '+'
+                      ? (parseFloat(decState.num1) + parseFloat(decState.num2)).toFixed(2)
+                      : (parseFloat(decState.num1) - parseFloat(decState.num2)).toFixed(2);
+                    const cleanUser = toEnglish(decState.userAnswer).replace('/', '.');
+                    if (Math.abs(parseFloat(cleanUser) - parseFloat(expected)) < 0.015) {
+                      SoundFX.success();
+                      setFeedback({ type: 'success', text: `محاسبه دقیق بود! پاسخ اعشاری تایید شد.` });
+                      handleAddEnergy(20);
+                      setTimeout(nextStageOrFinish, 1300);
+                    } else {
+                      SoundFX.error();
+                      setFeedback({ type: 'error', text: `راهنمایی: ارقام اعشاری را ستون به ستون ${decState.op === '+' ? 'جمع' : 'کم'} کنید. دقت کنید ممیزها کاملاً تراز باشند!` });
+                    }
+                  }}
+                  className="space-y-4 p-5 rounded-2xl bg-slate-950 border border-slate-800"
+                >
+                  <label className="block text-sm font-semibold text-slate-300">
+                    حاصل {decState.op === '+' ? 'جمع' : 'تفریق'} اعشاری را با ممیز وارد کنید:
+                  </label>
+                  <div className="flex gap-3">
+                    <input
+                      type="text"
+                      required
+                      placeholder="مثلاً: ۱۸/۴۵"
+                      value={decState.userAnswer}
+                      onChange={(e) => setDecState(prev => ({ ...prev, userAnswer: e.target.value }))}
+                      className="flex-1 px-4 py-3 rounded-xl bg-slate-900 border border-teal-500/50 text-white text-lg font-bold placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-400"
+                    />
+                    <button
+                      type="submit"
+                      className="px-6 py-3 rounded-xl bg-teal-500 hover:bg-teal-400 text-black font-bold shadow-lg shadow-teal-500/20 active:scale-95 transition-all"
+                    >
+                      تایید اعشار 🎯
+                    </button>
+                  </div>
+                </form>
+
+                {feedback && (
+                  <div className={`p-4 rounded-xl text-sm font-semibold ${feedback.type === 'success' ? 'bg-emerald-950/80 border border-emerald-500 text-emerald-300' : 'bg-rose-950/80 border border-rose-500 text-rose-300'}`}>
+                    {feedback.text}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ======================================================== */}
+            {/* MODULE 3: RATIOS (تناسب - جدول کاملاً راست‌چین فارسی)    */}
+            {/* ======================================================== */}
+            {activeModule === 'ratios' && (
+              <div className="p-6 md:p-8 rounded-3xl bg-slate-900/95 border border-purple-500/30 shadow-2xl space-y-6 text-right">
+                <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+                  <div>
+                    <h3 className="text-lg md:text-xl font-bold text-white">آزمایشگاه سوخت: جدول تناسب و رابطه ضربی چرخ‌دنده‌ها</h3>
+                    <p className="text-xs text-purple-400 mt-1">مرحله {toPersian(stage + 1)} از ۱۵</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-emerald-400 font-bold px-3 py-1 rounded-xl bg-emerald-950/80 border border-emerald-500/40">+۲۰ انرژی</span>
+                    <button onClick={() => setActiveModule(null)} className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs text-slate-300">خروج</button>
+                  </div>
+                </div>
+
+                {/* Word Problem Card */}
+                <div className="w-full max-w-md p-4 rounded-2xl bg-purple-950/40 border border-purple-500/40 text-right space-y-1 mx-auto">
+                  <div className="text-xs font-bold text-purple-300">📝 مسئله کاربردی جدول تناسب:</div>
+                  <p className="text-sm text-slate-100 font-semibold leading-relaxed">{ratioState.story}</p>
+                </div>
+
+                {/* Proportion Table Box (Strict RTL) */}
+                <div className="p-6 rounded-3xl bg-slate-950 border border-slate-800 flex flex-col items-center space-y-4">
+                  <div className="text-xs text-slate-400">جدول تناسب مسئله (خوانش از راست به چپ):</div>
+                  <div className="w-full max-w-md border-2 border-purple-500/40 rounded-2xl overflow-hidden text-center">
+                    <div className="grid grid-cols-3 bg-purple-950/60 font-bold text-purple-200 border-b border-purple-500/40 py-2.5 text-sm">
+                      <div>عنوان موتور</div>
+                      <div>نسبت پایه</div>
+                      <div>تعداد دوران نهایی</div>
+                    </div>
+                    <div className="grid grid-cols-3 py-3 border-b border-slate-800 text-base font-bold text-white">
+                      <div className="text-purple-300">موتور آلفا</div>
+                      <div className="text-cyan-300">{toPersian(ratioState.baseA)}</div>
+                      <div className="text-emerald-400 font-mono">{toPersian(ratioState.baseA * ratioState.mult)}</div>
+                    </div>
+                    <div className="grid grid-cols-3 py-3 text-base font-bold text-white bg-slate-900/40">
+                      <div className="text-purple-300">موتور بتا</div>
+                      <div className="text-cyan-300">{toPersian(ratioState.baseB)}</div>
+                      <div className="text-amber-400 font-mono">؟ (مجهول)</div>
+                    </div>
+                  </div>
+
+                  <div className="text-xs text-purple-300 text-center">
+                    💡 نکته تناسب: عدد سطر بالا ضرب در <strong className="text-emerald-400">{toPersian(ratioState.mult)}</strong> شده است؛ پس مقدار مجهول نیز باید دقیقاً ضرب در همان عدد شود!
+                  </div>
+                </div>
+
+                {/* Answer Form */}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const correctAns = ratioState.baseB * ratioState.mult;
+                    const uAns = parseInt(toEnglish(ratioState.userAns), 10);
+                    if (uAns === correctAns) {
+                      SoundFX.success();
+                      setFeedback({ type: 'success', text: `بسیار عالی! دور موتور بتا برابر با ${toPersian(correctAns)} است.` });
+                      handleAddEnergy(20);
+                      setTimeout(nextStageOrFinish, 1300);
+                    } else {
+                      SoundFX.error();
+                      setFeedback({ type: 'error', text: `نادرست! ${toPersian(ratioState.baseB)} ضرب در ${toPersian(ratioState.mult)} برابر ${toPersian(correctAns)} می‌شود.` });
+                    }
+                  }}
+                  className="space-y-4 p-5 rounded-2xl bg-slate-950 border border-slate-800"
+                >
+                  <label className="block text-sm font-semibold text-slate-300">
+                    تعداد دور دوران نهایی موتور بتا (؟) را وارد کنید:
+                  </label>
+                  <div className="flex gap-3">
+                    <input
+                      type="text"
+                      required
+                      placeholder="مقدار مجهول..."
+                      value={ratioState.userAns}
+                      onChange={(e) => setRatioState(prev => ({ ...prev, userAns: e.target.value }))}
+                      className="flex-1 px-4 py-3 rounded-xl bg-slate-900 border border-purple-500/50 text-white text-lg font-bold placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-400"
+                    />
+                    <button
+                      type="submit"
+                      className="px-6 py-3 rounded-xl bg-purple-500 hover:bg-purple-400 text-black font-bold shadow-lg shadow-purple-500/20 active:scale-95 transition-all"
+                    >
+                      تایید تناسب 🎯
+                    </button>
+                  </div>
+                </form>
+
+                {feedback && (
+                  <div className={`p-4 rounded-xl text-sm font-semibold ${feedback.type === 'success' ? 'bg-emerald-950/80 border border-emerald-500 text-emerald-300' : 'bg-rose-950/80 border border-rose-500 text-rose-300'}`}>
+                    {feedback.text}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ======================================================== */}
+            {/* MODULE 4: GEOMETRY (هندسه - لوزی و ذوزنقه SVG)            */}
+            {/* ======================================================== */}
+            {activeModule === 'geometry' && (
+              <div className="p-6 md:p-8 rounded-3xl bg-slate-900/95 border border-pink-500/30 shadow-2xl space-y-6 text-right">
+                <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+                  <div>
+                    <h3 className="text-lg md:text-xl font-bold text-white">کارگاه سازه‌ها: مساحت لوزی و ذوزنقه با شبیه‌سازی لیزری</h3>
+                    <p className="text-xs text-pink-400 mt-1">مرحله {toPersian(stage + 1)} از ۱۵ ({geoState.type === 'rhombus' ? 'لوزی' : 'ذوزنقه'})</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-emerald-400 font-bold px-3 py-1 rounded-xl bg-emerald-950/80 border border-emerald-500/40">+۲۰ انرژی</span>
+                    <button onClick={() => setActiveModule(null)} className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs text-slate-300">خروج</button>
+                  </div>
+                </div>
+
+                {/* Laser Cut Simulation Canvas */}
+                <div className="p-6 rounded-3xl bg-slate-950 border border-pink-500/40 flex flex-col items-center space-y-4">
+                  <div className="flex flex-wrap items-center justify-between w-full gap-2">
+                    <span className="text-xs text-slate-300">
+                      {geoState.type === 'rhombus'
+                        ? 'شبیه‌سازی احاطه مستطیل حول لوزی (مساحت لوزی دقیقاً نصف مساحت مستطیل است):'
+                        : 'شبیه‌سازی دوران ۱۸۰ درجه ذوزنقه دوم و تشکیل متوازی‌الاضلاع کامل:'}
+                    </span>
+                    <button
+                      onClick={() => {
+                        SoundFX.laser();
+                        setGeoState(prev => ({ ...prev, simulated: true }));
+                      }}
+                      className="px-4 py-2 rounded-xl bg-pink-600 hover:bg-pink-500 text-white font-bold text-xs shadow-md active:scale-95 transition-all"
+                    >
+                      ✂️ شبیه‌سازی برش لیزری
+                    </button>
+                  </div>
+
+                  {/* SVG Canvas */}
+                  <div className="w-full max-w-xl h-60 bg-slate-900/80 rounded-2xl border border-slate-800 p-2 flex items-center justify-center overflow-hidden">
+                    <svg viewBox="0 0 500 220" className="w-full h-full">
+                      {geoState.type === 'rhombus' ? (
+                        <g>
+                          {geoState.simulated && (
+                            <>
+                              <rect x="100" y="30" width="300" height="150" fill="none" stroke="#38bdf8" strokeWidth="2" strokeDasharray="6 6" />
+                              <polygon points="100,30 250,30 100,105" fill="rgba(244, 114, 182, 0.2)" />
+                              <polygon points="250,30 400,30 400,105" fill="rgba(244, 114, 182, 0.2)" />
+                              <polygon points="100,105 100,180 250,180" fill="rgba(244, 114, 182, 0.2)" />
+                              <polygon points="400,105 250,180 400,180" fill="rgba(244, 114, 182, 0.2)" />
+                            </>
+                          )}
+                          <polygon points="250,30 400,105 250,180 100,105" fill="rgba(236, 72, 153, 0.5)" stroke="#f472b6" strokeWidth="3" />
+                          <line x1="100" y1="105" x2="400" y2="105" stroke="#00f0ff" strokeWidth="2" strokeDasharray="4 4" />
+                          <line x1="250" y1="30" x2="250" y2="180" stroke="#00f0ff" strokeWidth="2" strokeDasharray="4 4" />
+                          <text x="250" y="205" fill="#38bdf8" fontSize="13" textAnchor="middle" fontWeight="bold">
+                            قطر بزرگ = {toPersian(geoState.d1)} متر
+                          </text>
+                          <text x="445" y="110" fill="#38bdf8" fontSize="13" textAnchor="middle" fontWeight="bold">
+                            قطر کوچک = {toPersian(geoState.d2)} متر
+                          </text>
+                        </g>
+                      ) : (
+                        <g>
+                          {geoState.simulated && (
+                            <polygon points="200,45 420,45 360,165 260,165" fill="rgba(56, 189, 248, 0.35)" stroke="#38bdf8" strokeWidth="2" strokeDasharray="4 4" />
+                          )}
+                          <polygon points="100,45 200,45 260,165 40,165" fill="rgba(236, 72, 153, 0.55)" stroke="#f472b6" strokeWidth="3" />
+                          <line x1="100" y1="45" x2="100" y2="165" stroke="#fbbf24" strokeWidth="2" strokeDasharray="3 3" />
+                          <text x="150" y="35" fill="#f472b6" fontSize="12" textAnchor="middle" fontWeight="bold">
+                            قاعده کوچک = {toPersian(geoState.b1)} متر
+                          </text>
+                          <text x="150" y="185" fill="#f472b6" fontSize="12" textAnchor="middle" fontWeight="bold">
+                            قاعده بزرگ = {toPersian(geoState.b2)} متر
+                          </text>
+                          <text x="80" y="110" fill="#fbbf24" fontSize="12" textAnchor="middle" fontWeight="bold">
+                            ارتفاع = {toPersian(geoState.h)}
+                          </text>
+                        </g>
+                      )}
+                    </svg>
+                  </div>
+
+                  <div className="text-xs text-pink-300 text-center">
+                    {geoState.type === 'rhombus'
+                      ? `فرمول مساحت لوزی: (قطر بزرگ × قطر کوچک) ÷ ۲  -> (${toPersian(geoState.d1)} × ${toPersian(geoState.d2)}) ÷ ۲`
+                      : `فرمول مساحت ذوزنقه: [(مجموع دو قاعده) × ارتفاع] ÷ ۲ -> [(${toPersian(geoState.b1)} + ${toPersian(geoState.b2)}) × ${toPersian(geoState.h)}] ÷ ۲`}
+                  </div>
+                </div>
+
+                {/* Answer Form */}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    let correct = 0;
+                    if (geoState.type === 'rhombus') {
+                      correct = (geoState.d1 * geoState.d2) / 2;
+                    } else {
+                      correct = ((geoState.b1 + geoState.b2) * geoState.h) / 2;
+                    }
+                    const uAns = parseFloat(toEnglish(geoState.userArea));
+                    if (Math.abs(uAns - correct) < 0.1) {
+                      SoundFX.success();
+                      setFeedback({ type: 'success', text: `محاسبه مساحت کاملاً درست بود! مساحت شکل برابر با ${toPersian(correct)} متر مربع است.` });
+                      handleAddEnergy(20);
+                      setTimeout(nextStageOrFinish, 1300);
+                    } else {
+                      SoundFX.error();
+                      setFeedback({ type: 'error', text: `خطا! پاسخ صحیح مساحت برابر با ${toPersian(correct)} متر مربع است.` });
+                    }
+                  }}
+                  className="space-y-4 p-5 rounded-2xl bg-slate-950 border border-slate-800"
+                >
+                  <label className="block text-sm font-semibold text-slate-300">
+                    مساحت نهایی شکل (متر مربع) را وارد کنید:
+                  </label>
+                  <div className="flex gap-3">
+                    <input
+                      type="text"
+                      required
+                      placeholder="مساحت..."
+                      value={geoState.userArea}
+                      onChange={(e) => setGeoState(prev => ({ ...prev, userArea: e.target.value }))}
+                      className="flex-1 px-4 py-3 rounded-xl bg-slate-900 border border-pink-500/50 text-white text-lg font-bold placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-pink-400"
+                    />
+                    <button
+                      type="submit"
+                      className="px-6 py-3 rounded-xl bg-pink-500 hover:bg-pink-400 text-black font-bold shadow-lg shadow-pink-500/20 active:scale-95 transition-all"
+                    >
+                      تایید مساحت 🎯
+                    </button>
+                  </div>
+                </form>
+
+                {feedback && (
+                  <div className={`p-4 rounded-xl text-sm font-semibold ${feedback.type === 'success' ? 'bg-emerald-950/80 border border-emerald-500 text-emerald-300' : 'bg-rose-950/80 border border-rose-500 text-rose-300'}`}>
+                    {feedback.text}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ======================================================== */}
+            {/* MODULE 5: STATISTICS (آمار و زمان - کاملاً راست‌چین)       */}
+            {/* ======================================================== */}
+            {activeModule === 'statistics' && (
+              <div className="p-6 md:p-8 rounded-3xl bg-slate-900/95 border border-amber-500/30 shadow-2xl space-y-6 text-right">
+                <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+                  <div>
+                    <h3 className="text-lg md:text-xl font-bold text-white">اتاق فرمان: محاسبات ساعت در مبنای ۶۰ دقیقه و میانگین</h3>
+                    <p className="text-xs text-amber-400 mt-1">مرحله {toPersian(stage + 1)} از ۱۵</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-emerald-400 font-bold px-3 py-1 rounded-xl bg-emerald-950/80 border border-emerald-500/40">+۲۰ انرژی</span>
+                    <button onClick={() => setActiveModule(null)} className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs text-slate-300">خروج</button>
+                  </div>
+                </div>
+
+                {/* Clock Math Visual Box */}
+                <div className="p-6 rounded-3xl bg-slate-950 border border-slate-800 flex flex-col items-center space-y-4 text-center">
+                  <div className="text-xs text-slate-400">محاسبه اختلاف زمان (زمان بزرگتر در چپ و زمان کوچکتر در راست):</div>
+                  <div className="flex flex-wrap items-center justify-center gap-6 text-2xl font-bold text-white" dir="ltr">
+                    {/* Left: Larger Time */}
+                    <div className="p-3 px-5 rounded-2xl bg-slate-900 border border-amber-500/40 text-amber-300">
+                      <span className="font-mono text-3xl font-extrabold tracking-wider" dir="ltr">
+                        {toPersian(statState.h1)}:{statState.m1 < 10 ? '۰' + toPersian(statState.m1) : toPersian(statState.m1)}
+                      </span>
+                      <div className="text-xs text-slate-400 mt-1">({toPersian(statState.h1)} ساعت و {toPersian(statState.m1)} دقیقه)</div>
+                    </div>
+
+                    <span className="text-rose-400 font-extrabold text-3xl">−</span>
+
+                    {/* Right: Smaller Time */}
+                    <div className="p-3 px-5 rounded-2xl bg-slate-900 border border-slate-700 text-slate-300">
+                      <span className="font-mono text-3xl font-extrabold tracking-wider" dir="ltr">
+                        {toPersian(statState.h2)}:{statState.m2 < 10 ? '۰' + toPersian(statState.m2) : toPersian(statState.m2)}
+                      </span>
+                      <div className="text-xs text-slate-400 mt-1">({toPersian(statState.h2)} ساعت و {toPersian(statState.m2)} دقیقه)</div>
+                    </div>
+                  </div>
+
+                  <div className="text-xs text-amber-300 mt-2">
+                    💡 توجه: چون {toPersian(statState.m1)} دقیقه از {toPersian(statState.m2)} دقیقه کمتر است، ۱ ساعت خرد کرده و ۶۰ دقیقه به دقایق اضافه کنید!
+                  </div>
+                </div>
+
+                {/* Answer Form (dir="ltr": Hours on Left of colon, Minutes on Right) */}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const totalDiff = (statState.h1 * 60 + statState.m1) - (statState.h2 * 60 + statState.m2);
+                    const expH = Math.floor(totalDiff / 60);
+                    const expM = totalDiff % 60;
+
+                    const uH = parseInt(toEnglish(statState.ansH), 10);
+                    const uM = parseInt(toEnglish(statState.ansM), 10);
+
+                    if (uH === expH && uM === expM) {
+                      SoundFX.success();
+                      setFeedback({ type: 'success', text: `محاسبه ساعت در مبنای ۶۰ عالی بود! حاصل اختلاف زمان تایید شد.` });
+                      handleAddEnergy(20);
+                      setTimeout(nextStageOrFinish, 1300);
+                    } else {
+                      SoundFX.error();
+                      setFeedback({ type: 'error', text: `راهنمایی: دقت کنید که با قرض گرفتن ۱ ساعت، ۶۰ دقیقه به دقایق اضافه می‌شود (نه ۱۰۰ دقیقه). مجدداً تفریق را محاسبه کنید!` });
+                    }
+                  }}
+                  className="space-y-4 p-5 rounded-2xl bg-slate-950 border border-slate-800"
+                >
+                  <label className="block text-sm font-semibold text-slate-300 text-center">
+                    زمان نهایی را وارد کنید (باکس ساعت در سمت چپ و باکس دقیقه در سمت راست علامت :):
+                  </label>
+                  <div className="flex flex-wrap items-center justify-center gap-4" dir="ltr">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        required
+                        placeholder="ساعت"
+                        value={statState.ansH}
+                        onChange={(e) => setStatState(prev => ({ ...prev, ansH: e.target.value }))}
+                        className="w-20 px-3 py-2.5 rounded-xl bg-slate-900 border border-amber-500/50 text-center text-white text-lg font-bold focus:outline-none focus:ring-2 focus:ring-amber-400"
+                      />
+                      <span className="text-sm text-slate-300">ساعت</span>
+                    </div>
+
+                    <span className="text-2xl font-bold text-slate-400">:</span>
+
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        required
+                        placeholder="دقیقه"
+                        value={statState.ansM}
+                        onChange={(e) => setStatState(prev => ({ ...prev, ansM: e.target.value }))}
+                        className="w-20 px-3 py-2.5 rounded-xl bg-slate-900 border border-amber-500/50 text-center text-white text-lg font-bold focus:outline-none focus:ring-2 focus:ring-amber-400"
+                      />
+                      <span className="text-sm text-slate-300">دقیقه</span>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold shadow-lg shadow-amber-500/20 active:scale-95 transition-all"
+                    >
+                      تایید زمان 🎯
+                    </button>
+                  </div>
+                </form>
+
+                {feedback && (
+                  <div className={`p-4 rounded-xl text-sm font-semibold ${feedback.type === 'success' ? 'bg-emerald-950/80 border border-emerald-500 text-emerald-300' : 'bg-rose-950/80 border border-rose-500 text-rose-300'}`}>
+                    {feedback.text}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>

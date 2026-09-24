@@ -1,11 +1,14 @@
 import type { NextConfig } from "next";
 
+const isGitHubPages = process.env.GITHUB_PAGES === 'true';
+
 const nextConfig: NextConfig = {
-  output: 'export',
-  basePath: '/galaxy-academy',
+  // Use basePath only when building specifically for GitHub Pages
+  basePath: isGitHubPages ? '/galaxy-academy' : '',
   images: {
     unoptimized: true,
   },
+  reactStrictMode: true,
 };
 
 export default nextConfig;

@@ -86,11 +86,27 @@ export default function Home() {
 
   // Called when student answers a question correctly in any module
   const handleCorrectAnswer = (energyReward = 20) => {
-    updateState((prev) => ({
-      ...prev,
-      lifeEnergy: prev.lifeEnergy + energyReward,
-      totalEnergyEarned: prev.totalEnergyEarned + energyReward,
-    }));
+    updateState((prev) => {
+      const nextTotal = prev.totalEnergyEarned + energyReward;
+      // 1500 points needed for 100% greenery coverage
+      const scoreGreenery = Math.min(100, Math.round((nextTotal / 1500) * 100));
+      const nextGreenery = Math.max(prev.planetGreenery, scoreGreenery);
+      const nextLevel = Math.max(prev.planetRestorationLevel, scoreGreenery);
+
+      if (nextGreenery >= 100 && prev.planetGreenery < 100) {
+        setTimeout(() => {
+          setIsVictoryModalOpen(true);
+        }, 600);
+      }
+
+      return {
+        ...prev,
+        lifeEnergy: prev.lifeEnergy + energyReward,
+        totalEnergyEarned: nextTotal,
+        planetGreenery: nextGreenery,
+        planetRestorationLevel: nextLevel,
+      };
+    });
   };
 
   // Called when student finishes all 15 stages of a module
@@ -101,9 +117,13 @@ export default function Home() {
         ? prev.completedModules
         : [...prev.completedModules, moduleKey];
 
-      const nextLevel = Math.min(100, nextCompleted.length * 20);
+      // Each module contributes 20% coverage, and 1500 points achieves 100%
+      const modulesPercent = Math.min(100, nextCompleted.length * 20);
+      const pointsPercent = Math.min(100, Math.round((prev.totalEnergyEarned / 1500) * 100));
+      const nextGreenery = Math.max(prev.planetGreenery, modulesPercent, pointsPercent);
+      const nextLevel = Math.max(prev.planetRestorationLevel, modulesPercent, pointsPercent);
 
-      if (nextLevel >= 100 && prev.planetRestorationLevel < 100) {
+      if ((nextCompleted.length >= 5 || nextGreenery >= 100) && prev.planetRestorationLevel < 100) {
         setTimeout(() => {
           setIsVictoryModalOpen(true);
         }, 600);
@@ -113,6 +133,7 @@ export default function Home() {
         ...prev,
         completedModules: nextCompleted,
         planetRestorationLevel: nextLevel,
+        planetGreenery: nextGreenery,
         moduleScores: {
           ...prev.moduleScores,
           [moduleKey]: 15,
@@ -161,8 +182,8 @@ export default function Home() {
       key: 'fractions',
       view: 'fractions' as ViewMode,
       title: '۱. موتورخانه (کسرها)',
-      subtitle: 'کیمیاگر رآکتور سوخت',
-      desc: 'تفریق اعداد مخلوط و کسرها با شکستن واحدهای کامل',
+      subtitle: '۵ گلوگاه حیاتی کسرها',
+      desc: 'تبدیل اعداد مخلوط، شکستن واحد در تفریق، مدل مساحتی ضرب، سهم‌بندی تقسیم و ساده‌سازی قبل از ضرب',
       icon: Flame,
       color: 'from-blue-600 to-cyan-500',
     },
@@ -170,8 +191,8 @@ export default function Home() {
       key: 'decimals',
       view: 'decimals' as ViewMode,
       title: '۲. سیستم ناوبری (اعشار)',
-      subtitle: 'تراز لیزری ممیزها',
-      desc: 'تراز موقعیت مکانی ممیز و استفاده از سپرهای صفر کمکی',
+      subtitle: 'ارزش مکانی، تراز ممیز و توان‌های ۱۰',
+      desc: 'تحلیل مرتبه دهم و هزارم، تراز لیزری ممیزها با سپر صفر و پرش ممیز در ضرب ۱۰، ۱۰۰ و ۱۰۰۰',
       icon: Crosshair,
       color: 'from-cyan-600 to-teal-500',
     },
@@ -179,8 +200,8 @@ export default function Home() {
       key: 'ratios',
       view: 'ratios' as ViewMode,
       title: '۳. آزمایشگاه سوخت (تناسب)',
-      subtitle: 'رآکتور تناسب و چرخ‌دنده‌ها',
-      desc: 'جداول تناسب و اعمال روابط ضربی برای توازن چرخ‌دنده‌ها',
+      subtitle: 'جدول سه‌ردیفه و درصد مالی',
+      desc: 'رابطه ضربی چرخ‌دنده‌ها، جدول سه‌ردیفه مجموع و اختلاف نسبت‌ها، و حل مسائل تخفیف و درصد',
       icon: Cog,
       color: 'from-purple-600 to-indigo-500',
     },
@@ -188,8 +209,8 @@ export default function Home() {
       key: 'geometry',
       view: 'geometry' as ViewMode,
       title: '۴. کارگاه سازه‌ها (هندسه)',
-      subtitle: 'برش لیزری صفحات سفینه',
-      desc: 'محاسبه مساحت لوزی و ذوزنقه با شبیه‌سازی لیزری و درک نصف شکل',
+      subtitle: 'تقارن، زوایا، مساحت، دایره و حجم',
+      desc: 'دوران ۱۸۰ درجه تقارن مرکزی، مجموع زوایا، مساحت لوزی/ذوزنقه، تله شعاع در محیط دایره و گنجایش لیتر',
       icon: Shapes,
       color: 'from-pink-600 to-rose-500',
     },
@@ -197,8 +218,8 @@ export default function Home() {
       key: 'statistics',
       view: 'statistics' as ViewMode,
       title: '۵. اتاق فرمان (آمار و زمان)',
-      subtitle: 'مبنای ۶۰ و تحلیل معکوس میانگین',
-      desc: 'محاسبات ساعت در مبنای ۶۰ دقیقه و یافتن مجموع از میانگین',
+      subtitle: 'زمان مبنای ۶۰، الگوها و میانگین معکوس',
+      desc: 'محاسبات ساعت در مبنای ۶۰، کشف رابطه جبری شماره شکل الگوها، و تحلیل معکوس میانگین داده‌ها',
       icon: Clock,
       color: 'from-amber-600 to-orange-500',
     },
