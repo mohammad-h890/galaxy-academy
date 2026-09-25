@@ -20,6 +20,7 @@ interface PlanetRevitalizationProps {
   lifeEnergy: number;
   totalEnergyEarned: number;
   planetGreenery: number;
+  injectedEnergy?: number;
   onInjectEnergy: (amount: number) => void;
 }
 
@@ -27,19 +28,24 @@ export function PlanetRevitalization({
   lifeEnergy,
   totalEnergyEarned,
   planetGreenery,
+  injectedEnergy,
   onInjectEnergy,
 }: PlanetRevitalizationProps) {
   const [animatingGrowth, setAnimatingGrowth] = useState(false);
   const [recentAction, setRecentAction] = useState<string | null>(null);
 
+  const displayInjected = injectedEnergy !== undefined
+    ? injectedEnergy
+    : Math.max(0, Math.min(1500, Math.round((planetGreenery / 100) * 1500)));
+
   const handleInfuse = (amount: number, label: string) => {
-    if (lifeEnergy < amount) {
+    if (lifeEnergy < amount || amount <= 0) {
       SoundFX.error();
       return;
     }
     SoundFX.terraforming();
     setAnimatingGrowth(true);
-    setRecentAction(label);
+    setRecentAction(`${label} (${toPersianDigits(amount)} واحد انرژی)`);
     onInjectEnergy(amount);
 
     setTimeout(() => {
@@ -273,7 +279,7 @@ export function PlanetRevitalization({
               </span>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-amber-300 font-mono">
-                  ({toPersianDigits(totalEnergyEarned)} از ۱۵۰۰ امتیاز)
+                  ({toPersianDigits(displayInjected)} از ۱۵۰۰ واحد تزریق‌شده)
                 </span>
                 <strong className="text-emerald-400 font-mono text-base font-bold tabular-nums">
                   ٪{toPersianDigits(planetGreenery)}
@@ -288,65 +294,88 @@ export function PlanetRevitalization({
               />
             </div>
             <div className="flex justify-between text-[11px] text-slate-500 mt-1">
-              <span>۰ امتیاز (کویر)</span>
-              <span>۷۵۰ امتیاز (۵۰٪ حیات)</span>
-              <span>۱۵۰۰ امتیاز (۱۰۰٪ پوشش کامل)</span>
+              <span>۰ واحد (کویر)</span>
+              <span>۷۵۰ واحد (۵۰٪ حیات)</span>
+              <span>۱۵۰۰ واحد (۱۰۰٪ بهشت کامل)</span>
             </div>
           </div>
 
           {/* Life Energy Injection Actions */}
           <div className="space-y-3">
-            <div className="text-xs font-semibold text-cyan-300">
-              عملیات‌های قابل اجرا با مصرف انرژی حیات:
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-cyan-300">
+                عملیات‌های قابل اجرا با مصرف انرژی حیات:
+              </span>
+              <span className="text-[11px] text-slate-400">
+                موجودی: <strong className="text-emerald-400 font-mono">{toPersianDigits(lifeEnergy)}</strong> واحد
+              </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               {/* Option 1: 20 energy */}
               <button
                 disabled={lifeEnergy < 20 || planetGreenery >= 100}
-                onClick={() => handleInfuse(20, 'کاشت بذرها و مراتع سبز')}
-                className="p-3.5 rounded-2xl bg-slate-950/80 hover:bg-slate-800 border border-emerald-500/30 hover:border-emerald-400 text-right transition-all disabled:opacity-40 disabled:cursor-not-allowed group active:scale-95 shadow-sm"
+                onClick={() => handleInfuse(20, 'کاشت مراتع و بذرها')}
+                className="p-3 rounded-2xl bg-slate-950/80 hover:bg-slate-800 border border-emerald-500/30 hover:border-emerald-400 text-right transition-all disabled:opacity-40 disabled:cursor-not-allowed group active:scale-95 shadow-sm"
               >
-                <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center justify-between mb-1">
                   <Sprout className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
-                  <span className="text-xs font-mono font-bold text-emerald-300">
+                  <span className="text-[11px] font-mono font-bold text-emerald-300">
                     ۲۰ انرژی ⚡
                   </span>
                 </div>
-                <div className="text-xs font-bold text-white mb-0.5">کاشت مراتع سبز</div>
-                <div className="text-[10px] text-slate-400">+۵٪ سرسبزی سیاره</div>
+                <div className="text-xs font-bold text-white mb-0.5">کاشت مراتع</div>
+                <div className="text-[10px] text-slate-400">+۱/۳٪ سرسبزی</div>
               </button>
 
-              {/* Option 2: 50 energy */}
-              <button
-                disabled={lifeEnergy < 50 || planetGreenery >= 100}
-                onClick={() => handleInfuse(50, 'باران مصنوعی و احیای رودها')}
-                className="p-3.5 rounded-2xl bg-slate-950/80 hover:bg-slate-800 border border-teal-500/30 hover:border-teal-400 text-right transition-all disabled:opacity-40 disabled:cursor-not-allowed group active:scale-95 shadow-sm"
-              >
-                <div className="flex items-center justify-between mb-1.5">
-                  <CloudRain className="w-4 h-4 text-teal-400 group-hover:scale-110 transition-transform" />
-                  <span className="text-xs font-mono font-bold text-teal-300">
-                    ۵۰ انرژی ⚡
-                  </span>
-                </div>
-                <div className="text-xs font-bold text-white mb-0.5">باران و احیای رودها</div>
-                <div className="text-[10px] text-slate-400">+۱۵٪ سرسبزی سیاره</div>
-              </button>
-
-              {/* Option 3: 100 energy */}
+              {/* Option 2: 100 energy */}
               <button
                 disabled={lifeEnergy < 100 || planetGreenery >= 100}
-                onClick={() => handleInfuse(100, 'پرورش جنگل‌های کهکشانی و جو اکسیژن')}
-                className="p-3.5 rounded-2xl bg-slate-950/80 hover:bg-slate-800 border border-cyan-500/30 hover:border-cyan-400 text-right transition-all disabled:opacity-40 disabled:cursor-not-allowed group active:scale-95 shadow-sm"
+                onClick={() => handleInfuse(100, 'باران و احیای پوشش گیاهی')}
+                className="p-3 rounded-2xl bg-slate-950/80 hover:bg-slate-800 border border-teal-500/30 hover:border-teal-400 text-right transition-all disabled:opacity-40 disabled:cursor-not-allowed group active:scale-95 shadow-sm"
               >
-                <div className="flex items-center justify-between mb-1.5">
-                  <TreePine className="w-4 h-4 text-cyan-400 group-hover:scale-110 transition-transform" />
-                  <span className="text-xs font-mono font-bold text-cyan-300">
+                <div className="flex items-center justify-between mb-1">
+                  <CloudRain className="w-4 h-4 text-teal-400 group-hover:scale-110 transition-transform" />
+                  <span className="text-[11px] font-mono font-bold text-teal-300">
                     ۱۰۰ انرژی ⚡
                   </span>
                 </div>
-                <div className="text-xs font-bold text-white mb-0.5">جنگل‌های کهکشانی</div>
-                <div className="text-[10px] text-slate-400">+۳۵٪ سرسبزی سیاره</div>
+                <div className="text-xs font-bold text-white mb-0.5">باران و گیاهان</div>
+                <div className="text-[10px] text-slate-400">+۶/۷٪ سرسبزی</div>
+              </button>
+
+              {/* Option 3: 300 energy */}
+              <button
+                disabled={lifeEnergy < 300 || planetGreenery >= 100}
+                onClick={() => handleInfuse(300, 'احیای کامل یک اقلیم کهکشانی')}
+                className="p-3 rounded-2xl bg-slate-950/80 hover:bg-slate-800 border border-cyan-500/30 hover:border-cyan-400 text-right transition-all disabled:opacity-40 disabled:cursor-not-allowed group active:scale-95 shadow-sm"
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <TreePine className="w-4 h-4 text-cyan-400 group-hover:scale-110 transition-transform" />
+                  <span className="text-[11px] font-mono font-bold text-cyan-300">
+                    ۳۰۰ انرژی ⚡
+                  </span>
+                </div>
+                <div className="text-xs font-bold text-white mb-0.5">احیای اقلیم</div>
+                <div className="text-[10px] text-slate-400">+۲۰٪ سرسبزی</div>
+              </button>
+
+              {/* Option 4: Inject All Available Energy */}
+              <button
+                disabled={lifeEnergy <= 0 || planetGreenery >= 100}
+                onClick={() => handleInfuse(lifeEnergy, 'تزریق یکجای تمام انرژی حیات')}
+                className="p-3 rounded-2xl bg-gradient-to-br from-emerald-950/90 to-cyan-950/90 hover:from-emerald-900 hover:to-cyan-900 border border-emerald-400/50 hover:border-emerald-300 text-right transition-all disabled:opacity-40 disabled:cursor-not-allowed group active:scale-95 shadow-sm"
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <Zap className="w-4 h-4 text-amber-300 group-hover:scale-110 transition-transform" />
+                  <span className="text-[11px] font-mono font-bold text-amber-300">
+                    کل موجودی ⚡
+                  </span>
+                </div>
+                <div className="text-xs font-bold text-white mb-0.5">تزریق تمام انرژی</div>
+                <div className="text-[10px] text-emerald-300">
+                  {lifeEnergy > 0 ? `${toPersianDigits(lifeEnergy)} واحد یکجا` : 'موجودی خالی'}
+                </div>
               </button>
             </div>
           </div>

@@ -436,7 +436,7 @@ export function RatiosModule({
                     </div>
                   </div>
                   <div className="text-xs text-purple-300">
-                    💡 نکته تناسب: «{q1.label1}» ضرب در <strong className="text-emerald-400">{toPersianDigits(q1.multiplier)}</strong> شده است؛ بنابراین «{q1.label2}» نیز باید در همان ضریب ضرب شود!
+                    💡 راهبرد حل: بررسی کنید در سطر «{q1.label1}»، نسبت پایه در چه عددی ضرب شده تا مقدار واقعی به دست آید؟ این ضریب را خودتان پیدا کنید و سپس نسبت سطر «{q1.label2}» را در همان ضریب ضرب نمایید.
                   </div>
                 </div>
 
@@ -516,7 +516,7 @@ export function RatiosModule({
                     </div>
                   </div>
                   <div className="text-xs text-purple-300">
-                    💡 راهبرد حل: ابتدا ضریب سطر سوم ({toPersianDigits(q2.knownVal)} ÷ {toPersianDigits(q2.thirdVal)} = <strong className="text-emerald-400">{toPersianDigits(q2.mult)}</strong>) را بیابید؛ سپس نسبت «{q2.label2}» را در آن ضرب کنید.
+                    💡 راهبرد حل: ابتدا با مقایسه سطر سوم ({q2.type === 'total' ? 'مجموع' : 'اختلاف'})، ضریب ضربی جدول را از تقسیم مقدار واقعی بر نسبت سطر سوم خودتان پیدا کنید؛ سپس نسبت سطر «{q2.label2}» را در همان ضریب ضرب کنید تا مقدار هدف مشخص شود.
                   </div>
                 </div>
 
@@ -560,7 +560,7 @@ export function RatiosModule({
                     قیمت یک باتری پلاسمایی <strong className="text-cyan-400">{toPersianDigits(q3.originalPrice)} هزار تومان</strong> است. اگر این باتری با <strong className="text-amber-400">٪{toPersianDigits(q3.discountPercent)} تخفیف</strong> ویژه مهندسان عرضه شود، قیمت پرداختی نهایی چقدر خواهد بود؟
                   </p>
                   <div className="text-xs text-purple-300 pt-1">
-                    💡 تخفیف = ({toPersianDigits(q3.discountPercent)} × {toPersianDigits(q3.originalPrice)}) ÷ ۱۰۰ = {toPersianDigits(q3.discountAmount)} هزار تومان.
+                    💡 راهبرد حل: ابتدا با محاسبه درصد تخفیف از قیمت اولیه، مقدار تخفیف را خودتان به دست آورید و سپس آن را از قیمت اولیه کسر کنید تا قیمت نهایی مشخص شود.
                   </div>
                 </div>
 

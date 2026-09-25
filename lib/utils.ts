@@ -29,6 +29,7 @@ export interface AppState {
   lifeEnergy: number; // Current spendable Life Energy
   totalEnergyEarned: number; // Lifetime total Life Energy earned
   planetGreenery: number; // 0 to 100: how lush and green the planet is from injected life energy
+  injectedEnergy: number; // Total energy injected into the planet soil (0 to 1500)
   completedModules: string[];
   moduleScores: Record<string, number>;
   mistakesLog: Record<string, number>;
@@ -43,6 +44,7 @@ export const defaultAppState: AppState = {
   lifeEnergy: 0,
   totalEnergyEarned: 0,
   planetGreenery: 0,
+  injectedEnergy: 0,
   completedModules: [],
   moduleScores: {
     fractions: 0,
@@ -67,12 +69,21 @@ export function loadAppState(): AppState {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return defaultAppState;
     const parsed = JSON.parse(raw);
+    const lifeEnergy = parsed.lifeEnergy ?? 0;
+    const totalEnergyEarned = parsed.totalEnergyEarned ?? 0;
+    // Calculate injected energy: if saved explicitly use it, else calculate from difference or greenery
+    const injectedEnergy = parsed.injectedEnergy !== undefined
+      ? parsed.injectedEnergy
+      : Math.max(0, Math.min(1500, totalEnergyEarned - lifeEnergy));
+    const planetGreenery = Math.min(100, Math.round((injectedEnergy / 1500) * 100));
+
     return {
       ...defaultAppState,
       ...parsed,
-      lifeEnergy: parsed.lifeEnergy ?? 0,
-      totalEnergyEarned: parsed.totalEnergyEarned ?? 0,
-      planetGreenery: parsed.planetGreenery ?? 0,
+      lifeEnergy,
+      totalEnergyEarned,
+      injectedEnergy,
+      planetGreenery,
       moduleScores: { ...defaultAppState.moduleScores, ...(parsed.moduleScores || {}) },
       mistakesLog: { ...defaultAppState.mistakesLog, ...(parsed.mistakesLog || {}) },
     };

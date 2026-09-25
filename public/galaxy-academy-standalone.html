@@ -221,13 +221,29 @@
     function loadState() {
       try {
         const d = localStorage.getItem(STORAGE_KEY);
-        if (d) return JSON.parse(d);
+        if (d) {
+          const parsed = JSON.parse(d);
+          const lifeEnergy = parsed.lifeEnergy ?? 0;
+          const totalEnergyEarned = parsed.totalEnergyEarned ?? 0;
+          const injectedEnergy = parsed.injectedEnergy !== undefined
+            ? parsed.injectedEnergy
+            : Math.max(0, Math.min(1500, totalEnergyEarned - lifeEnergy));
+          const planetGreenery = Math.min(100, Math.round((injectedEnergy / 1500) * 100));
+          return {
+            ...parsed,
+            lifeEnergy,
+            totalEnergyEarned,
+            injectedEnergy,
+            planetGreenery,
+          };
+        }
       } catch(e) {}
       return {
         playerName: '',
-        lifeEnergy: 100,
-        totalEnergyEarned: 100,
-        planetGreenery: 20,
+        lifeEnergy: 0,
+        totalEnergyEarned: 0,
+        injectedEnergy: 0,
+        planetGreenery: 0,
         completedModules: [],
         moduleScores: { fractions: 0, decimals: 0, ratios: 0, geometry: 0, statistics: 0 }
       };
@@ -317,13 +333,20 @@
       };
 
       const handleInjectEnergy = (cost) => {
-        if (appState.lifeEnergy < cost) return;
+        const spendable = Math.min(cost, appState.lifeEnergy);
+        if (spendable <= 0) return;
         SoundFX.laser();
-        const boost = cost >= 100 ? 35 : cost >= 50 ? 15 : 5;
+        const currentInjected = appState.injectedEnergy !== undefined
+          ? appState.injectedEnergy
+          : Math.max(0, Math.min(1500, appState.totalEnergyEarned - appState.lifeEnergy));
+        const nextInjected = Math.min(1500, currentInjected + spendable);
+        const nextGreenery = Math.min(100, Math.round((nextInjected / 1500) * 100));
+
         setAppState(prev => ({
           ...prev,
-          lifeEnergy: prev.lifeEnergy - cost,
-          planetGreenery: Math.min(100, prev.planetGreenery + boost)
+          lifeEnergy: prev.lifeEnergy - spendable,
+          injectedEnergy: nextInjected,
+          planetGreenery: nextGreenery
         }));
       };
 
@@ -530,7 +553,7 @@
                       <p className="text-xs text-slate-400 mt-0.5">انرژی حیات به دست آمده از حل چالش‌ها را به خاک سیاره تزریق کنید.</p>
                     </div>
                     <div className="px-4 py-1.5 rounded-2xl bg-slate-950 border border-emerald-500/40 text-emerald-400 font-bold text-sm flex items-center gap-2">
-                      <span className="text-xs text-amber-300">({toPersian(appState.totalEnergyEarned)} از ۱۵۰۰ امتیاز)</span>
+                      <span className="text-xs text-amber-300">({toPersian(appState.injectedEnergy || 0)} از ۱۵۰۰ واحد تزریق‌شده)</span>
                       <span>سرسبزی: ٪{toPersian(appState.planetGreenery)}</span>
                     </div>
                   </div>
@@ -543,36 +566,44 @@
                     />
                   </div>
                   <div className="flex justify-between text-[11px] text-slate-500">
-                    <span>۰ امتیاز (کویر)</span>
-                    <span>۷۵۰ امتیاز (۵۰٪ حیات)</span>
-                    <span>۱۵۰۰ امتیاز (۱۰۰٪ پوشش کامل)</span>
+                    <span>۰ واحد (کویر)</span>
+                    <span>۷۵۰ واحد (۵۰٪ حیات)</span>
+                    <span>۱۵۰۰ واحد (۱۰۰٪ بهشت کامل)</span>
                   </div>
 
                   {/* Inject Buttons */}
-                  <div className="flex flex-wrap gap-3 pt-1">
+                  <div className="flex flex-wrap gap-2.5 pt-1">
                     <button
                       onClick={() => handleInjectEnergy(20)}
                       disabled={appState.lifeEnergy < 20}
-                      className="px-4 py-2.5 rounded-xl bg-emerald-950/80 border border-emerald-500/50 hover:bg-emerald-900/70 disabled:opacity-30 disabled:cursor-not-allowed text-xs text-emerald-200 font-bold flex items-center gap-2 active:scale-95 transition-all"
+                      className="px-3.5 py-2.5 rounded-xl bg-emerald-950/80 border border-emerald-500/50 hover:bg-emerald-900/70 disabled:opacity-30 disabled:cursor-not-allowed text-xs text-emerald-200 font-bold flex items-center gap-1.5 active:scale-95 transition-all"
                     >
-                      <span>⚡ تزریق ۲۰ انرژی</span>
-                      <span className="text-[10px] text-emerald-400">(+۵٪ سرسبزی)</span>
-                    </button>
-                    <button
-                      onClick={() => handleInjectEnergy(50)}
-                      disabled={appState.lifeEnergy < 50}
-                      className="px-4 py-2.5 rounded-xl bg-teal-950/80 border border-teal-500/50 hover:bg-teal-900/70 disabled:opacity-30 disabled:cursor-not-allowed text-xs text-teal-200 font-bold flex items-center gap-2 active:scale-95 transition-all"
-                    >
-                      <span>⚡ تزریق ۵۰ انرژی</span>
-                      <span className="text-[10px] text-teal-400">(+۱۵٪ سرسبزی)</span>
+                      <span>⚡ ۲۰ انرژی</span>
+                      <span className="text-[10px] text-emerald-400">(+۱/۳٪ سرسبزی)</span>
                     </button>
                     <button
                       onClick={() => handleInjectEnergy(100)}
                       disabled={appState.lifeEnergy < 100}
-                      className="px-4 py-2.5 rounded-xl bg-cyan-950/80 border border-cyan-500/50 hover:bg-cyan-900/70 disabled:opacity-30 disabled:cursor-not-allowed text-xs text-cyan-200 font-bold flex items-center gap-2 active:scale-95 transition-all"
+                      className="px-3.5 py-2.5 rounded-xl bg-teal-950/80 border border-teal-500/50 hover:bg-teal-900/70 disabled:opacity-30 disabled:cursor-not-allowed text-xs text-teal-200 font-bold flex items-center gap-1.5 active:scale-95 transition-all"
                     >
-                      <span>🌟 تزریق ۱۰۰ انرژی</span>
-                      <span className="text-[10px] text-cyan-300">(+۳۵٪ جهش احیا)</span>
+                      <span>⚡ ۱۰۰ انرژی</span>
+                      <span className="text-[10px] text-teal-400">(+۶/۷٪ سرسبزی)</span>
+                    </button>
+                    <button
+                      onClick={() => handleInjectEnergy(300)}
+                      disabled={appState.lifeEnergy < 300}
+                      className="px-3.5 py-2.5 rounded-xl bg-cyan-950/80 border border-cyan-500/50 hover:bg-cyan-900/70 disabled:opacity-30 disabled:cursor-not-allowed text-xs text-cyan-200 font-bold flex items-center gap-1.5 active:scale-95 transition-all"
+                    >
+                      <span>🌟 ۳۰۰ انرژی</span>
+                      <span className="text-[10px] text-cyan-300">(+۲۰٪ سرسبزی)</span>
+                    </button>
+                    <button
+                      onClick={() => handleInjectEnergy(appState.lifeEnergy)}
+                      disabled={appState.lifeEnergy <= 0}
+                      className="px-3.5 py-2.5 rounded-xl bg-gradient-to-l from-emerald-900 to-cyan-900 border border-emerald-400/50 hover:brightness-110 disabled:opacity-30 disabled:cursor-not-allowed text-xs text-white font-bold flex items-center gap-1.5 active:scale-95 transition-all"
+                    >
+                      <span>🚀 کل موجودی</span>
+                      <span className="text-[10px] text-amber-300">({toPersian(appState.lifeEnergy)} انرژی)</span>
                     </button>
                   </div>
                 </div>
@@ -951,7 +982,7 @@
                   </div>
 
                   <div className="text-xs text-purple-300 text-center">
-                    💡 نکته تناسب: عدد سطر بالا ضرب در <strong className="text-emerald-400">{toPersian(ratioState.mult)}</strong> شده است؛ پس مقدار مجهول نیز باید دقیقاً ضرب در همان عدد شود!
+                    💡 راهبرد حل: ابتدا بررسی کنید در سطر اول نسبت پایه در چه عددی ضرب شده تا مقدار دوران نهایی به دست آید؟ این ضریب را خودتان پیدا کنید و سپس نسبت سطر دوم را در همان ضریب ضرب نمایید.
                   </div>
                 </div>
 

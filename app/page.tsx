@@ -88,23 +88,12 @@ export default function Home() {
   const handleCorrectAnswer = (energyReward = 20) => {
     updateState((prev) => {
       const nextTotal = prev.totalEnergyEarned + energyReward;
-      // 1500 points needed for 100% greenery coverage
-      const scoreGreenery = Math.min(100, Math.round((nextTotal / 1500) * 100));
-      const nextGreenery = Math.max(prev.planetGreenery, scoreGreenery);
-      const nextLevel = Math.max(prev.planetRestorationLevel, scoreGreenery);
-
-      if (nextGreenery >= 100 && prev.planetGreenery < 100) {
-        setTimeout(() => {
-          setIsVictoryModalOpen(true);
-        }, 600);
-      }
+      const nextLife = prev.lifeEnergy + energyReward;
 
       return {
         ...prev,
-        lifeEnergy: prev.lifeEnergy + energyReward,
+        lifeEnergy: nextLife,
         totalEnergyEarned: nextTotal,
-        planetGreenery: nextGreenery,
-        planetRestorationLevel: nextLevel,
       };
     });
   };
@@ -117,13 +106,10 @@ export default function Home() {
         ? prev.completedModules
         : [...prev.completedModules, moduleKey];
 
-      // Each module contributes 20% coverage, and 1500 points achieves 100%
-      const modulesPercent = Math.min(100, nextCompleted.length * 20);
-      const pointsPercent = Math.min(100, Math.round((prev.totalEnergyEarned / 1500) * 100));
-      const nextGreenery = Math.max(prev.planetGreenery, modulesPercent, pointsPercent);
-      const nextLevel = Math.max(prev.planetRestorationLevel, modulesPercent, pointsPercent);
+      // Each of the 5 modules completed gives 20% to spaceship restoration (5 * 20% = 100%)
+      const nextLevel = Math.min(100, nextCompleted.length * 20);
 
-      if ((nextCompleted.length >= 5 || nextGreenery >= 100) && prev.planetRestorationLevel < 100) {
+      if (nextCompleted.length >= 5 && prev.completedModules.length < 5) {
         setTimeout(() => {
           setIsVictoryModalOpen(true);
         }, 600);
@@ -133,7 +119,6 @@ export default function Home() {
         ...prev,
         completedModules: nextCompleted,
         planetRestorationLevel: nextLevel,
-        planetGreenery: nextGreenery,
         moduleScores: {
           ...prev.moduleScores,
           [moduleKey]: 15,
@@ -145,16 +130,28 @@ export default function Home() {
     setCurrentView('dashboard');
   };
 
-  // Infuse life energy to make the planet greener
+  // Infuse life energy to make the planet greener based on 1500 points target
   const handleInjectEnergy = (amount: number) => {
     updateState((prev) => {
-      if (prev.lifeEnergy < amount) return prev;
-      const boost = amount >= 100 ? 35 : amount >= 50 ? 15 : 5;
-      const nextGreenery = Math.min(100, prev.planetGreenery + boost);
+      const spendable = Math.min(amount, prev.lifeEnergy);
+      if (spendable <= 0) return prev;
+
+      const currentInjected = prev.injectedEnergy !== undefined
+        ? prev.injectedEnergy
+        : Math.max(0, Math.min(1500, prev.totalEnergyEarned - prev.lifeEnergy));
+      const nextInjected = Math.min(1500, currentInjected + spendable);
+      const nextGreenery = Math.min(100, Math.round((nextInjected / 1500) * 100));
+
+      if (nextGreenery >= 100 && prev.planetGreenery < 100) {
+        setTimeout(() => {
+          setIsVictoryModalOpen(true);
+        }, 600);
+      }
 
       return {
         ...prev,
-        lifeEnergy: prev.lifeEnergy - amount,
+        lifeEnergy: prev.lifeEnergy - spendable,
+        injectedEnergy: nextInjected,
         planetGreenery: nextGreenery,
       };
     });
@@ -334,6 +331,7 @@ export default function Home() {
               lifeEnergy={appState.lifeEnergy}
               totalEnergyEarned={appState.totalEnergyEarned}
               planetGreenery={appState.planetGreenery}
+              injectedEnergy={appState.injectedEnergy}
               onInjectEnergy={handleInjectEnergy}
             />
 
